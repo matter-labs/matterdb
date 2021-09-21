@@ -37,7 +37,6 @@ impl BinaryValue for StoredTransaction {
 pub struct MempoolSchema<T: Access> {
     pub transactions: MapIndex<T::Base, String, StoredTransaction>,
 }
-
 impl<T: Access> MempoolSchema<T> {
     pub fn new(access: T) -> Self {
         Self::from_access(access, IndexAddress::from_root("mempool")).unwrap()
@@ -119,7 +118,7 @@ fn list_cli() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     let schema = MempoolSchema::new(&fork);
-    schema.transactions_get("Test".to_string());
+    // schema.transactions_get("Test".to_string());
     // // Create some unrelated indexes.
     // fork.get_list("ba").push(10_u8);
     // fork.get_list("ba").push(10_u8);

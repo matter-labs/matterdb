@@ -7,6 +7,7 @@ use syn::{spanned::Spanned, Data, DataStruct, DeriveInput, FieldsNamed, Generics
 use std::collections::HashSet;
 
 use crate::find_meta_attrs;
+use syn::parse::Parser;
 
 #[derive(Debug)]
 struct BinaryValueStruct {
@@ -211,7 +212,7 @@ impl FromDeriveInput for FromAccess {
                     ident: input.ident.clone(),
                     access_ident: Self::extract_access_ident(&input.generics)?.clone(),
                     generics: input.generics.clone(),
-                    fields: Fields::try_from(fields)?.fields,
+                    fields: Fields::try_from(&fields)?.fields,
                     attrs,
                 };
 
@@ -390,12 +391,20 @@ impl FromAccess {
             idents.push(ident)
         });
 
+        let insert_idents: Vec<_> = idents
+            .into_iter()
+            .map(|ident| {
+                let ident_name = ident.to_string();
+                quote! { map.insert(#ident_name.to_string(), Self::#ident as fn(&Self, String) -> Option<String>) }
+            })
+            .collect();
+
         quote!(
             #(#getters)*
-            fn getters_ref(&self) -> HashMap<String, impl Fn (String) -> Option<String>> {
-                let mut a = HashMap::new();
-                #(a.insert(#idents.to_string(),  |key| self.#idents(key)); )*
-                a
+            fn getters_ref() -> HashMap<String, fn(&Self, String) -> Option<String>> {
+                let mut map = HashMap::new();
+                (#(# insert_idents );*);
+                map
             }
         )
     }
@@ -431,6 +440,7 @@ pub fn impl_from_access(input: TokenStream) -> TokenStream {
         Ok(access) => access,
         Err(e) => return e.write_errors().into(),
     };
+
     let tokens = quote!(#from_access);
     tokens.into()
 }
