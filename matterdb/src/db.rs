@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     validation::assert_valid_name_component,
-    views::{AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
+    views::{AsReadonly, ChangesIter, RawAccess, ResolvedAddress, View, IndexesPool},
     Error, Result,
 };
 

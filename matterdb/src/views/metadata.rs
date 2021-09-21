@@ -407,6 +407,27 @@ impl<T: RawAccessMut> IndexesPool<T> {
     }
 }
 
+/// Get information about indexes in database
+pub fn inspect_database<T: RawAccess>(
+    db: T,
+    sub_prefix: Option<String>,
+) -> Vec<(String, IndexType)> {
+    let pool = IndexesPool::new(db);
+    pool.0
+        // We have to skip first data it's usually `[]` key with unparsed indexMetadata
+        .iter::<_, Vec<u8>, Vec<u8>>(&sub_prefix.unwrap_or_default())
+        .skip(1)
+        .map(|(key, metadata)| {
+            let metadata =
+                IndexMetadata::<Vec<u8>>::from_bytes(std::borrow::Cow::from(metadata)).unwrap();
+            (
+                String::from_utf8_lossy(&key).to_string(),
+                metadata.index_type,
+            )
+        })
+        .collect()
+}
+
 #[derive(Debug)]
 pub struct GroupKeys<T: RawAccess, K: BinaryKey + ?Sized> {
     access: T,

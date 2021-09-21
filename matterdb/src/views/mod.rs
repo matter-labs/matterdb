@@ -15,7 +15,7 @@ use crate::{
 };
 
 mod address;
-mod metadata;
+pub(crate) mod metadata;
 #[cfg(test)]
 mod tests;
 

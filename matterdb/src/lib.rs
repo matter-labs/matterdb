@@ -127,7 +127,7 @@ pub use self::{
     lazy::Lazy,
     options::DBOptions,
     values::BinaryValue,
-    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress},
+    views::{metadata::inspect_database, AsReadonly, IndexAddress, IndexType, ResolvedAddress},
 };
 // Workaround for 'Linked file at path {matterdb_path}/struct.MapIndex.html
 // does not exist!'
