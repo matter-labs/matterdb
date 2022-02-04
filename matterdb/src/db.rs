@@ -696,10 +696,7 @@ impl Snapshot for Patch {
         let (mut res, db_keys) = keys.into_iter().enumerate().fold(
             (Vec::new(), Vec::new()),
             |(mut res, mut db_keys), (idx, key)| {
-                if let Ok(item) = changes
-                    .and_then(|changes| changes.get(key).transpose())
-                    .transpose()
-                {
+                if let Some(Ok(item)) = changes.map(|changes| changes.get(key)) {
                     res.push(item);
                 } else {
                     res.push(None);
@@ -1266,6 +1263,24 @@ mod tests {
         assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![2]));
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![3]));
+    }
+
+    #[test]
+    fn multi_get_for_patch() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![1]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        let patch = fork.into_patch();
+        assert_eq!(
+            patch.multi_get(&"foo".into(), &mut iter::once(&[] as &[u8])),
+            vec![Some(vec![1])]
+        );
     }
 
     #[test]
