@@ -8,6 +8,7 @@ use proptest::{
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
+use matterdb::inspect_database;
 use matterdb::{
     access::CopyAccessExt,
     migration::{rollback_migration, PersistentIter, PersistentKeys, Scratchpad},
@@ -256,4 +257,21 @@ fn persistent_iters_over_single_collection() {
         apply_actions(&db, actions)?;
         clear_scratchpad(&db);
     });
+}
+#[test]
+fn index_pool() {
+    let db = TemporaryDB::new();
+    fill_collections(&db);
+    let data = inspect_database(&db.fork(), None);
+    let expected_result = vec![
+        ("key_set".to_string(), IndexType::KeySet),
+        ("list".to_string(), IndexType::List),
+        ("list\u{0}\u{0}\u{0}\u{0}\u{1}".to_string(), IndexType::List),
+        ("list\u{0}\u{0}\u{0}\u{0}\u{3}".to_string(), IndexType::SparseList),
+        ("map".to_string(), IndexType::Map),
+        ("map\u{0}\u{0}\u{0}\u{0}\u{1}".to_string(), IndexType::Map),
+        ("set\u{0}\u{0}\u{0}\u{0}\u{1}".to_string(), IndexType::KeySet),
+        ("sparse_list".to_string(), IndexType::SparseList)
+    ];
+    assert_eq!(data, expected_result);
 }

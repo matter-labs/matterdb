@@ -1,12 +1,13 @@
 use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Data, DataStruct, DeriveInput, Generics};
+use quote::{format_ident, quote, ToTokens};
+use syn::{spanned::Spanned, Data, DataStruct, DeriveInput, FieldsNamed, Generics};
 
 use std::collections::HashSet;
 
 use crate::find_meta_attrs;
+use syn::parse::Parser;
 
 #[derive(Debug)]
 struct BinaryValueStruct {
@@ -211,7 +212,7 @@ impl FromDeriveInput for FromAccess {
                     ident: input.ident.clone(),
                     access_ident: Self::extract_access_ident(&input.generics)?.clone(),
                     generics: input.generics.clone(),
-                    fields: Fields::try_from(fields)?.fields,
+                    fields: Fields::try_from(&fields)?.fields,
                     attrs,
                 };
 
@@ -293,6 +294,21 @@ impl AccessField {
         }
     }
 
+    fn getter(&self) -> (impl ToTokens, Ident) {
+        let name_suffix = self.name_suffix.as_ref().unwrap();
+
+        let method_name = format_ident!("{}_get", name_suffix);
+        let field_name = format_ident!("{}", name_suffix);
+        let function = quote! {
+            fn #method_name(&self, key: String) -> Option<String> {
+                let parsed_key = serde_json::from_str(&key).unwrap();
+                self.#field_name
+                    .get(&parsed_key)
+                    .map(|v| serde_json::to_string(&v).unwrap())
+            }
+        };
+        (function, method_name)
+    }
     fn constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(matterdb::access::FromAccess);
         let ident = self.ident(field_index);
@@ -365,6 +381,33 @@ impl FromAccess {
             }
         }
     }
+
+    fn getter_functions(&self) -> impl ToTokens {
+        let mut getters = vec![];
+        let mut idents = vec![];
+        self.fields.iter().enumerate().for_each(|(i, field)| {
+            let (function, ident) = field.getter();
+            getters.push(function);
+            idents.push(ident)
+        });
+
+        let insert_idents: Vec<_> = idents
+            .into_iter()
+            .map(|ident| {
+                let ident_name = ident.to_string();
+                quote! { map.insert(#ident_name.to_string(), Self::#ident as fn(&Self, String) -> Option<String>) }
+            })
+            .collect();
+
+        quote!(
+            #(#getters)*
+            fn getters_ref() -> HashMap<String, fn(&Self, String) -> Option<String>> {
+                let mut map = HashMap::new();
+                (#(# insert_idents );*);
+                map
+            }
+        )
+    }
 }
 
 impl ToTokens for FromAccess {
@@ -375,12 +418,16 @@ impl ToTokens for FromAccess {
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let from_access_fn = self.access_fn();
+        let getters = self.getter_functions();
         let from_root_fn = self.root_fn();
 
         let expanded = quote! {
             impl #impl_generics #tr<#access_ident> for #name #ty_generics #where_clause {
                 #from_access_fn
                 #from_root_fn
+            }
+            impl #impl_generics #name #ty_generics #where_clause {
+                #getters
             }
         };
         tokens.extend(expanded);
@@ -393,6 +440,7 @@ pub fn impl_from_access(input: TokenStream) -> TokenStream {
         Ok(access) => access,
         Err(e) => return e.write_errors().into(),
     };
+
     let tokens = quote!(#from_access);
     tokens.into()
 }
