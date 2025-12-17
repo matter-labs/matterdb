@@ -1,42 +1,41 @@
 [package]
 name = "matterdb"
-version = "1.3.0"
-edition = "2018"
-authors = ["Igor Aleksanov <popzxc@yandex.ru>", "The Exonum Team <contact@exonum.com>"]
-repository = "https://github.com/popzxc/matterdb"
-documentation = "https://docs.rs/matterdb"
-readme = "../README.md"
-license = "Apache-2.0"
-
-keywords = ["database"]
-categories = ["database", "data-structures"]
-description = "Persistent storage implementation based on RocksDB."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Persistent storage implementation based on RocksDB"
+readme = "README.md"
 
 [dependencies]
-anyhow = "1.0"
-byteorder = "1.3"
-chrono = "0.4.6"
-crossbeam = "0.8.0"
-rocksdb = { version = "0.17.0", default-features = false }
-rust_decimal = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-smallvec = "1.6"
-thiserror = "1.0"
-uuid = { version = "0.8", features = ["v4"] }
+# FIXME: make deps optional where appropriate
+anyhow.workspace = true
+byteorder.workspace = true
+chrono.workspace = true
+crossbeam.workspace = true
+rocksdb.workspace = true
+rust_decimal.workspace = true
+serde = { workspace = true, features = ["derive"] }
+smallvec.workspace = true
+thiserror.workspace = true
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-matterdb-derive = { version = "1.0.0", path = "../derive" }
+matterdb-derive.workspace = true
 
-assert_matches = "1.3"
-bincode = "1.3"
-criterion = "0.3"
-modifier = "0.1"
-proptest = "1.0"
-pretty_assertions = "0.7"
-rand = "0.8"
-rand_xorshift = "0.3.0"
-url = "2.0"
-tempfile = "3.2"
+assert_matches.workspace = true
+bincode.workspace = true
+criterion.workspace = true
+modifier.workspace = true
+proptest.workspace = true
+pretty_assertions.workspace = true
+rand.workspace = true
+rand_xorshift.workspace = true
+url.workspace = true
+tempfile.workspace = true
 
 [[bench]]
 name = "criterion"
@@ -44,6 +43,7 @@ path = "benches/lib.rs"
 harness = false
 
 [features]
+# FIXME: revise features
 default = ["rocksdb_snappy"]
 with-serde = []
 
@@ -56,3 +56,6 @@ rocksdb_bzip2 = ["rocksdb/bzip2"]
 
 # Enables long benchmarks; does not influence main crate code.
 long_benchmarks = []
+
+[lints]
+workspace = true
