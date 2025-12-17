@@ -2,19 +2,18 @@
 
 //! Property testing for key set index and value set index as a rust collection.
 
+use std::{collections::HashSet, hash::Hash, rc::Rc};
+
+use matterdb::{Fork, KeySetIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
 use proptest::{
     collection::vec, prop_assert, prop_oneof, proptest, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use std::{collections::HashSet, hash::Hash, rc::Rc};
-
-use matterdb::{access::AccessExt, Fork, KeySetIndex, TemporaryDB};
-
 mod common;
 
-use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
+use crate::common::{ACTIONS_MAX_LEN, AsForkAction, ForkAction, FromFork, compare_collections};
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {

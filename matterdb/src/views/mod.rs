@@ -1,18 +1,16 @@
-pub use self::{
-    address::{IndexAddress, ResolvedAddress},
-    metadata::{IndexType},
-};
-pub(crate) use self::metadata::{
-    BinaryAttribute, GroupKeys, IndexMetadata, IndexState, IndexesPool,
-    ViewWithMetadata,
-};
-
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
+pub(crate) use self::metadata::{
+    BinaryAttribute, GroupKeys, IndexMetadata, IndexState, IndexesPool, ViewWithMetadata,
+};
+pub use self::{
+    address::{IndexAddress, ResolvedAddress},
+    metadata::IndexType,
+};
 use crate::{
+    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     views::address::key_bytes,
-    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
 mod address;
@@ -342,8 +340,7 @@ impl<T: RawAccess> View<T> {
 
 impl<T: RawAccessMut> View<T> {
     fn changes_mut(&mut self) -> &mut ViewChanges {
-        const ACCESS_ERROR: &str =
-            "Attempt to modify a readonly view of the database using a generic access. \
+        const ACCESS_ERROR: &str = "Attempt to modify a readonly view of the database using a generic access. \
              The caller should check the access type before calling any mutable methods";
 
         match self {

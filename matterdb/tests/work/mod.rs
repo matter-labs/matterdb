@@ -1,15 +1,14 @@
 //! Operations on indexes shared between `backup` and `migration` tests.
 
-use proptest::{
-    collection::vec, option, prop_assert_eq, prop_oneof, sample, strategy, strategy::Strategy,
-    test_runner::TestCaseResult,
-};
-
 use std::collections::BTreeMap;
 
 use matterdb::{
-    access::{Access, AccessExt, RawAccessMut},
     IndexAddress, IndexType,
+    access::{Access, AccessExt, RawAccessMut},
+};
+use proptest::{
+    collection::vec, option, prop_assert_eq, prop_oneof, sample, strategy, strategy::Strategy,
+    test_runner::TestCaseResult,
 };
 
 /// Possible index names.

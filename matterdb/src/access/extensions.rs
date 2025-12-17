@@ -1,10 +1,10 @@
 //! Extension traits to simplify index instantiation.
 
 use crate::{
-    access::{Access, FromAccess},
-    views::IndexType,
     BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
     SparseListIndex,
+    access::{Access, FromAccess},
+    views::IndexType,
 };
 
 /// Extension trait allowing for easy access to indexes from any type implementing
@@ -92,8 +92,7 @@ pub trait CopyAccessExt: Access + Copy {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ListIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
+        ListIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a map index with the specified address.
@@ -269,7 +268,7 @@ impl<T: Access> AccessExt for T {}
 #[cfg(test)]
 mod tests {
     use super::{AccessExt, CopyAccessExt, IndexType};
-    use crate::{access::Prefixed, migration::Migration, Database, TemporaryDB};
+    use crate::{Database, TemporaryDB, access::Prefixed, migration::Migration};
 
     #[test]
     fn index_type_works() {

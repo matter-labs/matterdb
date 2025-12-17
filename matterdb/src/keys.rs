@@ -301,12 +301,12 @@ impl BinaryKey for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
-    use crate::access::CopyAccessExt;
-
     use std::{fmt::Debug, str::FromStr};
 
     use chrono::{Duration, TimeZone};
+
+    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
+    use crate::access::CopyAccessExt;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -340,7 +340,7 @@ mod tests {
         (fuzz $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
-                use rand::{distr::StandardUniform, Rng};
+                use rand::{Rng, distr::StandardUniform};
                 let rng = rand::rng();
 
                 // Fuzzed roundtrip
@@ -432,22 +432,24 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use rand::{Rng};
+        use rand::Rng;
 
         let mut rng = rand::rng();
 
         let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
-            let time1 = Utc.timestamp_opt(
-                rng.random::<i64>() % i64::from(i32::MAX),
-                rng.random::<u32>() % 1_000_000_000,
-            )
-            .unwrap();
-            let time2 = Utc.timestamp_opt(
-                rng.random::<i64>() % i64::from(i32::MAX),
-                rng.random::<u32>() % 1_000_000_000,
-            )
-            .unwrap();
+            let time1 = Utc
+                .timestamp_opt(
+                    rng.random::<i64>() % i64::from(i32::MAX),
+                    rng.random::<u32>() % 1_000_000_000,
+                )
+                .unwrap();
+            let time2 = Utc
+                .timestamp_opt(
+                    rng.random::<i64>() % i64::from(i32::MAX),
+                    rng.random::<u32>() % 1_000_000_000,
+                )
+                .unwrap();
             time1.write(&mut buffer1);
             time2.write(&mut buffer2);
             assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
@@ -477,19 +479,27 @@ mod tests {
         assert_eq!(index.get(&x2), Some(y2));
 
         assert_eq!(
-            index.iter_from(&Utc.timestamp_opt(0, 0).unwrap()).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(0, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x2, y2), (x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp_opt(20, 0).unwrap()).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(20, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp_opt(80, 0).unwrap()).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(80, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp_opt(90, 0).unwrap()).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(90, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![]
         );
 

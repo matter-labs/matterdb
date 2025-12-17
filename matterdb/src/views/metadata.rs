@@ -1,14 +1,14 @@
+use std::{borrow::Cow, convert::TryFrom, io::Error, mem, num::NonZeroU64, vec};
+
 use anyhow::{ensure, format_err};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
 
-use std::{borrow::Cow, convert::TryFrom, io::Error, mem, num::NonZeroU64, vec};
-
 use crate::{
+    BinaryKey, BinaryValue,
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
     views::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View},
-    BinaryKey, BinaryValue,
 };
 
 /// Name of the column family used to store `IndexesPool`.
@@ -611,15 +611,15 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        vec, BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType,
-        IndexesPool, NonZeroU64,
-    };
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
-
     use std::collections::{BTreeSet, HashMap};
 
-    use rand::{seq::IndexedRandom, Rng};
+    use rand::{Rng, seq::IndexedRandom};
+
+    use super::{
+        BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool,
+        NonZeroU64, vec,
+    };
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -765,8 +765,7 @@ mod tests {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::{GroupKeys, IndexAddress, RawAccess};
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
+    use std::collections::{BTreeSet, HashMap};
 
     use proptest::{
         collection::vec,
@@ -775,7 +774,8 @@ mod prop_tests {
         test_runner::TestCaseResult,
     };
 
-    use std::collections::{BTreeSet, HashMap};
+    use super::{GroupKeys, IndexAddress, RawAccess};
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     const ACTIONS_MAX_LEN: usize = 30;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;

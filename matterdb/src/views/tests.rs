@@ -1,14 +1,14 @@
+use std::{num::NonZeroU64, panic, rc::Rc};
+
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
-use std::{num::NonZeroU64, panic, rc::Rc};
-
 use crate::{
+    DBOptions, Database, Fork, ListIndex, MapIndex, ResolvedAddress, RocksDB, TemporaryDB,
     access::CopyAccessExt,
     db,
     validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
-    DBOptions, Database, Fork, ListIndex, MapIndex, ResolvedAddress, RocksDB, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -928,8 +928,8 @@ fn test_metadata_incorrect_index_type() {
 #[test]
 fn test_metadata_index_wrong_type() {
     use crate::{
-        access::{AccessError, AccessErrorKind, FromAccess},
         ListIndex,
+        access::{AccessError, AccessErrorKind, FromAccess},
     };
 
     let db = TemporaryDB::new();
@@ -954,9 +954,9 @@ fn test_metadata_index_wrong_type() {
 #[test]
 fn test_valid_tombstone() {
     use crate::{
+        ListIndex,
         access::{AccessErrorKind, FromAccess},
         migration::Migration,
-        ListIndex,
     };
 
     let db = TemporaryDB::new();

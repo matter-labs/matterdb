@@ -1,10 +1,10 @@
+use std::hint::black_box;
+
 use criterion::{
     AxisScale, BatchSize, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use matterdb::{access::CopyAccessExt, Fork, ListIndex, MapIndex};
-
-use std::hint::black_box;
+use matterdb::{Fork, ListIndex, MapIndex, access::CopyAccessExt};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::BenchDB;
 

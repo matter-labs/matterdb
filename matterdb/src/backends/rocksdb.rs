@@ -8,17 +8,18 @@ pub mod backup {
     };
 }
 
-use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
-use rocksdb::{
-    self, checkpoint::Checkpoint, Cache as RocksDBCache, ColumnFamily, DBIterator,
-    Options as RocksDBOptions, WriteBatch, WriteOptions as RocksDBWriteOptions,
-};
-use smallvec::SmallVec;
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
+use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
+use rocksdb::{
+    self, Cache as RocksDBCache, ColumnFamily, DBIterator, Options as RocksDBOptions, WriteBatch,
+    WriteOptions as RocksDBWriteOptions, checkpoint::Checkpoint,
+};
+use smallvec::SmallVec;
+
 use crate::{
-    db::{check_database, Change},
     DBOptions, Database, Iter, Iterator, Patch, ResolvedAddress, Snapshot,
+    db::{Change, check_database},
 };
 
 /// Size of a byte representation of an index ID, which is used to prefix index keys
@@ -51,9 +52,7 @@ impl From<&DBOptions> for RocksDBOptions {
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
         defaults.set_max_total_wal_size(opts.max_total_wal_size.unwrap_or(0));
         if let Some(capacity) = opts.max_cache_size {
-            defaults.set_row_cache(
-                &RocksDBCache::new_lru_cache(capacity),
-            );
+            defaults.set_row_cache(&RocksDBCache::new_lru_cache(capacity));
         }
         defaults
     }
@@ -80,9 +79,9 @@ impl RocksDB {
     /// If the database does not exist at the indicated path and the option
     /// `create_if_missing` is switched on in `DBOptions`, a new database will
     /// be created at the indicated path.
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Propagates I/O errors. Returns an error on incompatible MatterDB version.
     pub fn open<P: AsRef<Path>>(path: P, options: &DBOptions) -> crate::Result<Self> {
         let inner = {
@@ -107,9 +106,9 @@ impl RocksDB {
     /// Successfully created checkpoint can be opened using `RocksDB::open`.
     ///
     /// [`RocksDB` docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Propagates I/O errors.
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
         let guard = self.get_db_lock_guard();
@@ -323,7 +322,11 @@ impl Iterator for RocksDBIterator<'_> {
             return None;
         }
 
-        let (key, value) = self.iter.peek()?.as_ref().expect("failed iterating over RocksDB");
+        let (key, value) = self
+            .iter
+            .peek()?
+            .as_ref()
+            .expect("failed iterating over RocksDB");
         let key = if let Some(prefix) = self.prefix {
             if key[..ID_SIZE] != prefix {
                 self.ended = true;

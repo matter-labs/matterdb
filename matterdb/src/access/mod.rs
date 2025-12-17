@@ -41,17 +41,16 @@
 //! [`CopyAccessExt`]: trait.CopyAccessExt.html
 //! [`FromAccess`]: trait.FromAccess.html
 
-use thiserror::Error;
-
 use std::fmt;
+
+use thiserror::Error;
 
 pub use self::extensions::{AccessExt, CopyAccessExt};
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
-
 use crate::{
+    BinaryKey,
     validation::assert_valid_name_component,
     views::{GroupKeys, IndexAddress, IndexMetadata, IndexType, ViewWithMetadata},
-    BinaryKey,
 };
 
 mod extensions;

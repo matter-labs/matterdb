@@ -6,10 +6,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryValue,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Values},
     views::{IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryValue,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -379,8 +379,8 @@ where
 mod tests {
     use super::{ListIndex, RawAccessMut};
     use crate::{
-        access::{AccessExt, CopyAccessExt},
         Database, Fork, TemporaryDB,
+        access::{AccessExt, CopyAccessExt},
     };
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {

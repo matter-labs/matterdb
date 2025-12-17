@@ -2,9 +2,8 @@ use std::{borrow::Cow, fmt, hint::black_box};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{Bencher, Criterion};
-use rand::{rngs::StdRng, RngCore, SeedableRng};
-
 use matterdb::BinaryValue;
+use rand::{RngCore, SeedableRng, rngs::StdRng};
 
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 32] = [100; 32];

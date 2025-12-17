@@ -7,10 +7,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryKey,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Keys},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryKey,
 };
 
 /// A set of key items.
@@ -207,7 +207,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::KeySetIndex;
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     const INDEX_NAME: &str = "test_index_name";
 

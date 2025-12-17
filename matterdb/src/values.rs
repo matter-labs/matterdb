@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, io::Read};
 
-use anyhow::{self, format_err, Context};
+use anyhow::{self, Context, format_err};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
@@ -175,9 +175,7 @@ impl BinaryValue for DateTime<Utc> {
         let nanos = value.read_u32::<LittleEndian>()?;
         Utc.timestamp_opt(secs, nanos)
             .single()
-            .with_context(|| {
-                format!("stored timestamp out of range: {secs}, {nanos}")
-            })
+            .with_context(|| format!("stored timestamp out of range: {secs}, {nanos}"))
     }
 }
 
@@ -206,8 +204,7 @@ impl BinaryValue for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
-    use std::str::FromStr;
+    use std::{fmt::Debug, str::FromStr};
 
     use chrono::Duration;
 

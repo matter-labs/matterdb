@@ -87,7 +87,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     use super::{FromAccess, Lazy};
-    use crate::{access::AccessErrorKind, Database, IndexType, ListIndex, MapIndex, TemporaryDB};
+    use crate::{Database, IndexType, ListIndex, MapIndex, TemporaryDB, access::AccessErrorKind};
 
     #[test]
     fn lazy_initialization() {

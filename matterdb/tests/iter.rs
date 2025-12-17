@@ -12,13 +12,6 @@
 //!
 //! Each access kind is tested in the raw variation and within a `Prefixed` access.
 
-use proptest::{
-    collection::{hash_map, vec},
-    num, prop_assert, prop_assert_eq, prop_oneof, proptest, sample, strategy,
-    strategy::Strategy,
-    test_runner::TestCaseResult,
-};
-
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
@@ -26,10 +19,16 @@ use std::{
 };
 
 use matterdb::{
+    BinaryKey, BinaryValue, Database, Fork, IndexAddress, IndexType, Snapshot, TemporaryDB,
     access::{Access, AccessExt, Prefixed, RawAccessMut},
     generic::{ErasedAccess, IntoErased},
     indexes::IndexIterator,
-    BinaryKey, BinaryValue, Database, Fork, IndexAddress, IndexType, Snapshot, TemporaryDB,
+};
+use proptest::{
+    collection::{hash_map, vec},
+    num, prop_assert, prop_assert_eq, prop_oneof, proptest, sample, strategy,
+    strategy::Strategy,
+    test_runner::TestCaseResult,
 };
 
 /// Possible index names.

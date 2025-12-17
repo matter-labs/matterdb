@@ -1,13 +1,12 @@
-use criterion::{Bencher, Criterion, Throughput};
-use matterdb_derive::{BinaryValue, FromAccess};
-use rand::{rngs::StdRng, Rng, SeedableRng};
-
 use std::hint::black_box;
 
+use criterion::{Bencher, Criterion, Throughput};
 use matterdb::{
-    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
     Group, KeySetIndex, Lazy, ListIndex, MapIndex,
+    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
 };
+use matterdb_derive::{BinaryValue, FromAccess};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::BenchDB;
 

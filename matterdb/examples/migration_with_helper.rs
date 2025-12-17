@@ -12,8 +12,9 @@
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
-use matterdb::{migration::MigrationHelper, Database};
 use std::sync::Arc;
+
+use matterdb::{Database, migration::MigrationHelper};
 
 mod migration;
 

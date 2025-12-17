@@ -62,26 +62,25 @@
 //!
 //! None yet.
 
-pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
-
-use thiserror::Error;
-
 use std::{
     fmt,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
+use thiserror::Error;
+
+pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
 use crate::{
+    BinaryKey, Database, Fork, ReadonlyFork,
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::{assert_valid_name_component, check_index_valid_full_name},
     views::{
         AsReadonly, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, RawAccessMut,
         View, ViewWithMetadata,
     },
-    BinaryKey, Database, Fork, ReadonlyFork,
 };
 
 mod persistent_iter;
@@ -431,9 +430,9 @@ impl MigrationHelper {
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the migration is aborted or merging the changes into the DB fails.
     #[allow(clippy::missing_panics_doc)] // false positive
     pub fn merge(&mut self) -> Result<(), MigrationError> {
@@ -455,7 +454,7 @@ impl MigrationHelper {
     /// If no iterators are instantiated within the closure, a single iteration will be performed.
     ///
     /// # Errors
-    /// 
+    ///
     /// An error is returned if the DB merge fails on any iteration.
     pub fn iter_loop(
         &mut self,
@@ -602,17 +601,19 @@ pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        flush_migration, rollback_migration, AbortHandle, Arc, Database, IndexAddress, IndexType,
-        Migration, MigrationError, MigrationHelper, Scratchpad, ViewWithMetadata, SCRATCHPAD_NAME,
-    };
-    use crate::{
-        access::{AccessExt, CopyAccessExt, RawAccess},
-        TemporaryDB,
-    };
+    use std::{collections::HashMap, sync::mpsc, thread, time::Duration};
 
     use assert_matches::assert_matches;
-    use std::{collections::HashMap, sync::mpsc, thread, time::Duration};
+
+    use super::{
+        AbortHandle, Arc, Database, IndexAddress, IndexType, Migration, MigrationError,
+        MigrationHelper, SCRATCHPAD_NAME, Scratchpad, ViewWithMetadata, flush_migration,
+        rollback_migration,
+    };
+    use crate::{
+        TemporaryDB,
+        access::{AccessExt, CopyAccessExt, RawAccess},
+    };
 
     #[test]
     fn in_memory_migration() {

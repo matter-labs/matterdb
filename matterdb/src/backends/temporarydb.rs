@@ -1,17 +1,18 @@
 //! An implementation of `TemporaryDB` database.
 
-use crossbeam::sync::ShardedLock;
-use smallvec::SmallVec;
 use std::{
-    collections::{btree_map::Range, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, btree_map::Range},
     iter::{Iterator, Peekable},
     sync::Arc,
 };
 
+use crossbeam::sync::ShardedLock;
+use smallvec::SmallVec;
+
 use crate::{
-    backends::rocksdb::{next_id_bytes, ID_SIZE},
-    db::{check_database, Change, Iterator as DBIterator},
     Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
+    backends::rocksdb::{ID_SIZE, next_id_bytes},
+    db::{Change, Iterator as DBIterator, check_database},
 };
 
 type MemoryDB = HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;

@@ -1,17 +1,16 @@
 //! Tests `DatabaseExt::merge_with_backup()`.
 
+use std::collections::{HashMap, HashSet};
+
+use matterdb::{
+    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
+    access::{Access, AccessExt},
+};
 use proptest::{
     collection::vec,
     prop_assert, prop_oneof, proptest, strategy,
     strategy::Strategy,
     test_runner::{Config, TestCaseResult},
-};
-
-use std::collections::{HashMap, HashSet};
-
-use matterdb::{
-    access::{Access, AccessExt},
-    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
 };
 
 mod work;

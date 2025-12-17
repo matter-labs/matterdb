@@ -8,13 +8,13 @@ use std::{io::Error, marker::PhantomData};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
+    BinaryValue,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{
         BinaryAttribute, IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View,
         ViewWithMetadata,
     },
-    BinaryValue,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -496,7 +496,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{access::CopyAccessExt, db::Database, TemporaryDB};
+    use crate::{TemporaryDB, access::CopyAccessExt, db::Database};
 
     const IDX_NAME: &str = "idx_name";
 

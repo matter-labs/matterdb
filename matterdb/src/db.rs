@@ -11,9 +11,9 @@ use std::{
 };
 
 use crate::{
+    Error, Result,
     validation::assert_valid_name_component,
     views::{AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
-    Error, Result,
 };
 
 /// Changes related to a specific `View`.
@@ -208,9 +208,7 @@ impl WorkingPatch {
             .unwrap_or_else(|| {
                 // If the `changes` are `None`, this means they have been taken by a previous call
                 // to `take_view_changes` and not yet returned.
-                panic!(
-                    "Attempting to borrow {address:?} immutably while it's borrowed mutably"
-                );
+                panic!("Attempting to borrow {address:?} immutably while it's borrowed mutably");
             })
             .clone()
     }
@@ -226,26 +224,19 @@ impl WorkingPatch {
             // `Fork` mutably; this forces both mutable and immutable index borrows to be dropped,
             // since they borrow `Fork` immutably.
             let changes = changes.unwrap_or_else(|| {
-                panic!(
-                    "changes are still mutably borrowed at address {address:?}"
-                );
+                panic!("changes are still mutably borrowed at address {address:?}");
             });
             // Check that changes are not borrowed immutably (in this case, there is another
             // `Rc<_>` pointer to changes somewhere).
             let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
-                panic!(
-                    "changes are still immutably borrowed at address {address:?}"
-                );
+                panic!("changes are still immutably borrowed at address {address:?}");
             });
 
             // The patch may already contain changes related to the `address`. If it does,
             // we extend these changes with the new changes (relying on the fact that
             // newer changes override older ones), unless the view was cleared (in which case,
             // the old changes do not matter and should be forgotten).
-            let patch_changes = patch
-                .changes
-                .entry(address)
-                .or_default();
+            let patch_changes = patch.changes.entry(address).or_default();
             if changes.is_cleared() {
                 *patch_changes = changes;
             } else {
@@ -1137,13 +1128,13 @@ pub(crate) fn check_database(db: &mut dyn Database) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::{
         AsReadonly, Change, Database, DatabaseExt, Fork, OwnedReadonlyFork, Patch, Rc,
         ResolvedAddress, Snapshot, StdIterator, View,
     };
-    use crate::{access::CopyAccessExt, TemporaryDB};
-
-    use std::collections::HashSet;
+    use crate::{TemporaryDB, access::CopyAccessExt};
 
     #[test]
     fn readonly_indexes_are_timely_dropped() {
@@ -1326,7 +1317,7 @@ mod tests {
 
     #[test]
     fn borrows_from_owned_forks() {
-        use crate::{access::AccessExt, Entry};
+        use crate::{Entry, access::AccessExt};
 
         let db = TemporaryDB::new();
         let fork = Rc::new(db.fork());

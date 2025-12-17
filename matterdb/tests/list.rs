@@ -4,19 +4,18 @@
 
 //! Property testing for list index as a rust collection.
 
+use std::rc::Rc;
+
+use matterdb::{BinaryValue, Fork, ListIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
 use proptest::{
     collection::vec, num, prop_assert, prop_oneof, proptest, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use std::rc::Rc;
-
-use matterdb::{access::AccessExt, BinaryValue, Fork, ListIndex, TemporaryDB};
-
 mod common;
 
-use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
+use crate::common::{ACTIONS_MAX_LEN, AsForkAction, ForkAction, FromFork, compare_collections};
 
 #[derive(Debug, Clone)]
 enum ListAction<V> {

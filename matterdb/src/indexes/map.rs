@@ -7,10 +7,10 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
+    BinaryKey, BinaryValue,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryKey, BinaryValue,
 };
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
@@ -315,7 +315,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     const IDX_NAME: &str = "idx_name";
 

@@ -10,7 +10,7 @@
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
-use matterdb::{access::Prefixed, migration::Migration, Database, Fork, ReadonlyFork};
+use matterdb::{Database, Fork, ReadonlyFork, access::Prefixed, migration::Migration};
 
 mod migration;
 

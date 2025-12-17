@@ -1,11 +1,10 @@
 //! Tests that compare collections and corresponding rust types using proptest.
 
-use modifier::Modifier;
-use proptest::test_runner::TestCaseResult;
-
 use std::rc::Rc;
 
 use matterdb::{Database, Fork, TemporaryDB};
+use modifier::Modifier;
+use proptest::test_runner::TestCaseResult;
 
 /// Max size of the generated sequence of actions.
 pub(crate) const ACTIONS_MAX_LEN: usize = 100;

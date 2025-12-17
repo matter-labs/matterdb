@@ -1,9 +1,9 @@
+use std::collections::HashSet;
+
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Generics, LitStr};
-
-use std::collections::HashSet;
+use quote::{ToTokens, quote};
+use syn::{Attribute, Data, DataStruct, DeriveInput, Generics, LitStr, spanned::Spanned};
 
 #[derive(Debug)]
 struct BinaryValueStruct {
@@ -48,7 +48,9 @@ struct BinaryValueAttrs {
 
 impl BinaryValueAttrs {
     fn new(attrs: &[Attribute]) -> syn::Result<Self> {
-        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("binary_value"));
+        let attrs = attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("binary_value"));
         let mut codec = Codec::default();
         for attr in attrs {
             attr.parse_nested_meta(|meta| {
@@ -123,8 +125,7 @@ impl ToTokens for BinaryValueStruct {
 
 pub(crate) fn impl_binary_value(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
-    let db_object = BinaryValueStruct::new(&input)
-        .unwrap_or_else(|e| panic!("BinaryValue: {e}"));
+    let db_object = BinaryValueStruct::new(&input).unwrap_or_else(|e| panic!("BinaryValue: {e}"));
     let tokens = quote! { #db_object };
     tokens.into()
 }
@@ -166,7 +167,9 @@ struct FromAccessAttrs {
 
 impl FromAccessAttrs {
     fn new(attrs: &[Attribute]) -> syn::Result<Self> {
-        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("from_access"));
+        let attrs = attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("from_access"));
         let mut transparent = false;
         for attr in attrs {
             attr.parse_nested_meta(|meta| {
@@ -190,7 +193,9 @@ struct FromAccessFieldAttrs {
 
 impl FromAccessFieldAttrs {
     fn new(attrs: &[Attribute]) -> syn::Result<Self> {
-        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("from_access"));
+        let attrs = attrs
+            .iter()
+            .filter(|attr| attr.path().is_ident("from_access"));
 
         let mut rename = None;
         let mut flatten = false;
@@ -239,7 +244,10 @@ impl FromAccess {
         // No type params with the overt attribute or `T: Access` constraint.
         let mut params = generics.type_params();
         let type_param = params.next().ok_or_else(|| {
-            syn::Error::new(generics.span(), "`FromAccess` struct should be generic over `Access` type")
+            syn::Error::new(
+                generics.span(),
+                "`FromAccess` struct should be generic over `Access` type",
+            )
         })?;
         if params.next().is_some() {
             let msg = "Cannot find type param implementing `Access` trait. \
@@ -262,7 +270,10 @@ impl FromAccess {
                     ident: input.ident.clone(),
                     access_ident: Self::extract_access_ident(&input.generics)?.clone(),
                     generics: input.generics.clone(),
-                    fields: fields.iter().map(AccessField::new).collect::<syn::Result<_>>()?,
+                    fields: fields
+                        .iter()
+                        .map(AccessField::new)
+                        .collect::<syn::Result<_>>()?,
                     attrs,
                 };
 
@@ -279,9 +290,8 @@ impl FromAccess {
 
                     for field in &this.fields {
                         if let Some(ref name) = field.name_suffix {
-                            validate_address_component(name).map_err(|msg| {
-                                syn::Error::new(field.span, msg)
-                            })?;
+                            validate_address_component(name)
+                                .map_err(|msg| syn::Error::new(field.span, msg))?;
                             if !field_names.insert(name) {
                                 let e = "Duplicate field name";
                                 return Err(syn::Error::new(field.span, e));

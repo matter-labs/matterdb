@@ -3,9 +3,9 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryValue,
     access::{Access, AccessError, FromAccess},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryValue,
 };
 
 /// An index that may only contain one element.

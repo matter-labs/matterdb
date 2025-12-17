@@ -1,8 +1,8 @@
 //! Generic iterator types used by all indexes.
 
 use crate::{
-    views::{Iter, RawAccess, View},
     BinaryKey, BinaryValue,
+    views::{Iter, RawAccess, View},
 };
 
 /// Iterator over key-value pairs of an index.

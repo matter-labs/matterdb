@@ -1,7 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use matterdb::{DBOptions, Database, Fork, Patch, Result, RocksDB, Snapshot};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 pub(crate) mod encoding;
 pub(crate) mod schema_patterns;

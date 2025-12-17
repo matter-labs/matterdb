@@ -13,11 +13,12 @@
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
-use matterdb::{
-    migration::{MigrationError, MigrationHelper},
-    Database,
-};
 use std::sync::Arc;
+
+use matterdb::{
+    Database,
+    migration::{MigrationError, MigrationHelper},
+};
 
 mod migration;
 
@@ -34,11 +35,11 @@ use crate::migration::{perform_migration, v1, v2};
 fn migrate_wallets(helper: &mut MigrationHelper) -> Result<(), MigrationError> {
     // Size is selected so that we can safely store part of the migration in RAM.
     const CHUNK_SIZE: usize = 1_000;
-    
+
     helper.iter_loop(|helper, iters| {
         let old_schema = v1::Schema::new(helper.old_data());
         let mut new_schema = v2::Schema::new(helper.new_data());
-        
+
         let mut count = 0;
         for (public_key, wallet) in iters
             .create("wallets", &old_schema.wallets)

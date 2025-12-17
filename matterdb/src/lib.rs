@@ -92,6 +92,10 @@ pub mod _reexports {
     pub use anyhow::Error;
 }
 
+// Workaround for 'Linked file at path {matterdb_path}/struct.MapIndex.html
+// does not exist!'
+#[doc(no_inline)]
+pub use self::indexes::{Entry, Group, KeySetIndex, ListIndex, MapIndex, SparseListIndex};
 pub use self::{
     backends::{
         rocksdb::{self, RocksDB},
@@ -108,10 +112,6 @@ pub use self::{
     values::BinaryValue,
     views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress},
 };
-// Workaround for 'Linked file at path {matterdb_path}/struct.MapIndex.html
-// does not exist!'
-#[doc(no_inline)]
-pub use self::indexes::{Entry, Group, KeySetIndex, ListIndex, MapIndex, SparseListIndex};
 
 #[macro_use]
 mod macros;

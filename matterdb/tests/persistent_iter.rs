@@ -1,18 +1,17 @@
 //! Property testing for persistent iterators. The test checks that persistent iterators do not
 //! skip or duplicate items, and that multiple iterators over the same collection are independent.
 
+use matterdb::{
+    Database, Fork, IndexAddress, IndexType, TemporaryDB,
+    access::CopyAccessExt,
+    migration::{PersistentIter, PersistentKeys, Scratchpad, rollback_migration},
+};
 use proptest::{
     collection::vec, num, prop_assert_eq, prop_oneof, proptest, sample, strategy,
     strategy::Strategy, test_runner::TestCaseResult,
 };
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-
-use matterdb::{
-    access::CopyAccessExt,
-    migration::{rollback_migration, PersistentIter, PersistentKeys, Scratchpad},
-    Database, Fork, IndexAddress, IndexType, TemporaryDB,
-};
 
 const ACTIONS_MAX_LEN: usize = 50;
 

@@ -12,16 +12,15 @@
 
 #![allow(clippy::wildcard_imports)]
 
-use matterdb_derive::{BinaryValue, FromAccess};
-use rand::{seq::IndexedRandom, Rng};
-
 use std::sync::Arc;
 
 use matterdb::{
-    access::{Access, CopyAccessExt, FromAccess, Prefixed},
-    migration::{flush_migration, Migration},
     Database, Entry, Group, ListIndex, MapIndex, Snapshot, TemporaryDB,
+    access::{Access, CopyAccessExt, FromAccess, Prefixed},
+    migration::{Migration, flush_migration},
 };
+use matterdb_derive::{BinaryValue, FromAccess};
+use rand::{Rng, seq::IndexedRandom};
 
 const USER_COUNT: usize = 10_000;
 
@@ -88,10 +87,7 @@ fn create_initial_data() -> TemporaryDB {
             schema.wallets.put(&public_key, wallet);
 
             let history_len = rng.random_range(0..10);
-            schema
-                .histories
-                .get(&public_key)
-                .extend(0..history_len);
+            schema.histories.get(&public_key).extend(0..history_len);
         }
     }
 

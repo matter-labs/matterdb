@@ -2,17 +2,16 @@
 
 // cspell:ignore oneof
 
+use std::{collections::HashMap, hash::Hash, rc::Rc};
+
+use matterdb::{BinaryValue, Fork, MapIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
 use proptest::{
     collection::vec, num, prop_assert, prop_assert_eq, prop_oneof, proptest, strategy,
     strategy::Strategy, test_runner::TestCaseResult,
 };
 
-use std::{collections::HashMap, hash::Hash, rc::Rc};
-
-use matterdb::{access::AccessExt, BinaryValue, Fork, MapIndex, TemporaryDB};
-
-use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
+use crate::common::{ACTIONS_MAX_LEN, AsForkAction, ForkAction, FromFork, compare_collections};
 
 mod common;
 
