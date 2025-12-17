@@ -340,14 +340,14 @@ mod tests {
         (fuzz $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
-                use rand::{distributions::Standard, thread_rng, Rng};
-                let rng = thread_rng();
+                use rand::{distr::StandardUniform, Rng};
+                let rng = rand::rng();
 
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];
                 let handpicked_vals = vec![$type::MIN, $type::MAX];
                 for x in rng
-                    .sample_iter(&Standard)
+                    .sample_iter(&StandardUniform)
                     .take(FUZZ_SAMPLES)
                     .chain(handpicked_vals)
                 {
@@ -356,9 +356,12 @@ mod tests {
                 }
 
                 // Fuzzed ordering
-                let rng = thread_rng();
+                let rng = rand::rng();
                 let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
-                let mut vals: Vec<$type> = rng.sample_iter(&Standard).take(FUZZ_SAMPLES).collect();
+                let mut vals: Vec<$type> = rng
+                    .sample_iter(&StandardUniform)
+                    .take(FUZZ_SAMPLES)
+                    .collect();
                 vals.sort_unstable();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);
@@ -429,20 +432,20 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use rand::{thread_rng, Rng};
+        use rand::{Rng};
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
             let time1 = Utc.timestamp_opt(
-                rng.r#gen::<i64>() % i64::from(i32::MAX),
-                rng.r#gen::<u32>() % 1_000_000_000,
+                rng.random::<i64>() % i64::from(i32::MAX),
+                rng.random::<u32>() % 1_000_000_000,
             )
             .unwrap();
             let time2 = Utc.timestamp_opt(
-                rng.r#gen::<i64>() % i64::from(i32::MAX),
-                rng.r#gen::<u32>() % 1_000_000_000,
+                rng.random::<i64>() % i64::from(i32::MAX),
+                rng.random::<u32>() % 1_000_000_000,
             )
             .unwrap();
             time1.write(&mut buffer1);

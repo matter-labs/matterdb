@@ -619,7 +619,7 @@ mod tests {
 
     use std::collections::{BTreeSet, HashMap};
 
-    use rand::{seq::SliceRandom, thread_rng, Rng};
+    use rand::{seq::IndexedRandom, Rng};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -741,11 +741,11 @@ mod tests {
         fork.get_entry(("te", "st")).set(0_u8);
         fork.get_entry("test_test").set(0_u8);
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         let mut groups: HashMap<&'static str, BTreeSet<_>> = HashMap::new();
         for _ in 0..1_000 {
             let group = *GROUPS.choose(&mut rng).unwrap();
-            let prefix: u32 = rng.r#gen();
+            let prefix: u32 = rng.random();
             groups.entry(group).or_default().insert(prefix);
             fork.get_entry((group, &prefix)).set(0_u8);
         }

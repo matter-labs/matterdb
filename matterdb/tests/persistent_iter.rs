@@ -38,17 +38,17 @@ impl Collection {
 
     fn fill(self, fork: &Fork, rng: &mut impl Rng) {
         let addr = self.get_address();
-        let item_count = rng.gen_range(25..100);
+        let item_count = rng.random_range(25..100);
         match self.ty {
             IndexType::List => {
                 let mut list = fork.get_list(addr);
-                list.extend((0..item_count).map(|_| rng.r#gen::<u64>()));
+                list.extend((0..item_count).map(|_| rng.random::<u64>()));
             }
             IndexType::SparseList => {
                 let mut list = fork.get_sparse_list(addr);
                 for _ in 0..item_count {
-                    let index = rng.r#gen::<u64>() % 256;
-                    let value = rng.r#gen::<u64>();
+                    let index = rng.random::<u64>() % 256;
+                    let value = rng.random::<u64>();
                     list.set(index, value);
                 }
             }
@@ -56,8 +56,8 @@ impl Collection {
             IndexType::Map => {
                 let mut map = fork.get_map(addr);
                 for _ in 0..item_count {
-                    let key = rng.r#gen::<u64>() & 0xffff;
-                    let value = rng.r#gen::<u64>();
+                    let key = rng.random::<u64>() & 0xffff;
+                    let value = rng.random::<u64>();
                     map.put(&key, value);
                 }
             }
@@ -65,7 +65,7 @@ impl Collection {
             IndexType::KeySet => {
                 let mut set = fork.get_key_set(addr);
                 for _ in 0..item_count {
-                    set.insert(&rng.r#gen::<u64>());
+                    set.insert(&rng.random::<u64>());
                 }
             }
 

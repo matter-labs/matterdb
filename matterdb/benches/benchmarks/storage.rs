@@ -1,9 +1,10 @@
 use criterion::{
-    black_box, AxisScale, BatchSize, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput,
+    AxisScale, BatchSize, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-
 use matterdb::{access::CopyAccessExt, Fork, ListIndex, MapIndex};
+
+use std::hint::black_box;
 
 use super::BenchDB;
 

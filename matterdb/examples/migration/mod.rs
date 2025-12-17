@@ -13,8 +13,7 @@
 #![allow(clippy::wildcard_imports)]
 
 use matterdb_derive::{BinaryValue, FromAccess};
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use serde::{Deserialize, Serialize};
+use rand::{seq::IndexedRandom, Rng};
 
 use std::sync::Arc;
 
@@ -32,7 +31,7 @@ pub(crate) type Hash = u32;
 pub(crate) mod v1 {
     use super::*;
 
-    #[derive(Debug, Serialize, Deserialize, BinaryValue)]
+    #[derive(Debug, bincode::Encode, bincode::Decode, BinaryValue)]
     #[binary_value(codec = "bincode")]
     pub(crate) struct Wallet {
         pub public_key: PublicKey, // << removed in `v2`
@@ -77,18 +76,18 @@ fn create_initial_data() -> TemporaryDB {
         schema.ticker.set("XNM".to_owned());
         schema.divisibility.set(8);
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         for user_id in 0..USER_COUNT {
             let public_key = u16::try_from(user_id).unwrap();
             let username = (*NAMES.choose(&mut rng).unwrap()).to_string();
             let wallet = v1::Wallet {
                 public_key,
                 username,
-                balance: rng.gen_range(0..1_000),
+                balance: rng.random_range(0..1_000),
             };
             schema.wallets.put(&public_key, wallet);
 
-            let history_len = rng.gen_range(0..10);
+            let history_len = rng.random_range(0..10);
             schema
                 .histories
                 .get(&public_key)
@@ -104,7 +103,7 @@ fn create_initial_data() -> TemporaryDB {
 pub(crate) mod v2 {
     use super::*;
 
-    #[derive(Debug, Serialize, Deserialize, BinaryValue)]
+    #[derive(Debug, bincode::Encode, bincode::Decode, BinaryValue)]
     #[binary_value(codec = "bincode")]
     pub(crate) struct Wallet {
         pub username: String,
@@ -112,7 +111,7 @@ pub(crate) mod v2 {
         pub history_hash: Hash, // << new field
     }
 
-    #[derive(Debug, Serialize, Deserialize, BinaryValue)]
+    #[derive(Debug, bincode::Encode, bincode::Decode, BinaryValue)]
     #[binary_value(codec = "bincode")]
     pub(crate) struct Config {
         pub ticker: String,

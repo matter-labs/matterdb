@@ -1,7 +1,8 @@
-use criterion::{black_box, Bencher, Criterion, Throughput};
+use criterion::{Bencher, Criterion, Throughput};
 use matterdb_derive::{BinaryValue, FromAccess};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde::{Deserialize, Serialize};
+
+use std::hint::black_box;
 
 use matterdb::{
     access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
@@ -22,7 +23,7 @@ const COLD_DIVISOR: u64 = 13;
 /// Chance to access `other_cold_index`.
 const COLD_CHANCE: u64 = 29;
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[derive(Clone, Copy, Debug, PartialEq, bincode::Encode, bincode::Decode, BinaryValue)]
 #[binary_value(codec = "bincode")]
 struct Transaction {
     value: u64,
@@ -236,8 +237,8 @@ fn gen_random_transactions(count: usize) -> Vec<Transaction> {
     let mut rng = StdRng::from_seed(SEED);
     (0..count)
         .map(|_| Transaction {
-            value: rng.r#gen(),
-            _payload: rng.r#gen(),
+            value: rng.random(),
+            _payload: rng.random(),
         })
         .collect()
 }

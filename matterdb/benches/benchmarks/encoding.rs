@@ -1,7 +1,7 @@
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, fmt, hint::black_box};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use criterion::{black_box, Bencher, Criterion};
+use criterion::{Bencher, Criterion};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use matterdb::BinaryValue;
@@ -69,7 +69,7 @@ fn gen_bytes_data() -> Vec<u8> {
 
 fn check_binary_value<T>(data: T) -> T
 where
-    T: BinaryValue + Debug + PartialEq,
+    T: BinaryValue + fmt::Debug + PartialEq,
 {
     let bytes = data.to_bytes();
     assert_eq!(T::from_bytes(bytes.into()).unwrap(), data);
@@ -95,7 +95,7 @@ fn gen_cursor_data() -> CursorData {
 fn bench_binary_value<F, V>(c: &mut Criterion, name: &str, f: F)
 where
     F: Fn() -> V + 'static + Clone + Copy,
-    V: BinaryValue + PartialEq + Debug,
+    V: BinaryValue + PartialEq + fmt::Debug,
 {
     // Checks that binary value is correct.
     let val = f();

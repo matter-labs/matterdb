@@ -72,7 +72,7 @@ impl BinaryValueStruct {
         quote! {
             impl ::matterdb::BinaryValue for #name {
                 fn to_bytes(&self) -> std::vec::Vec<u8> {
-                    bincode::serialize(self).expect(
+                    ::bincode::encode_to_vec(self, ::bincode::config::standard()).expect(
                         concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
                     )
                 }
@@ -80,7 +80,16 @@ impl BinaryValueStruct {
                 fn from_bytes(
                     value: std::borrow::Cow<[u8]>,
                 ) -> std::result::Result<Self, matterdb::_reexports::Error> {
-                    bincode::deserialize(value.as_ref()).map_err(From::from)
+                    let (parsed, read_bytes) = ::bincode::decode_from_slice(
+                        value.as_ref(),
+                        ::bincode::config::standard(),
+                    )?;
+                    if read_bytes < value.len() {
+                        return Err(matterdb::_reexports::Error::msg(
+                            format!("Extra bytes after parsing value: read {read_bytes}, total {} bytes", value.len()),
+                        ));
+                    }
+                    Ok(parsed)
                 }
             }
         }
