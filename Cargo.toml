@@ -40,10 +40,9 @@ rand = "0.8"
 rand_xorshift = "0.3.0"
 url = "2.0"
 tempfile = "3.2"
-darling = "0.12.0" # FIXME: remove
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = "1.0" # FIXME: update to 2.0
+syn = "2.0"
 
 # Workspace dependencoes
 matterdb-derive = { version = "=2.0.0-pre", path = "derive" }

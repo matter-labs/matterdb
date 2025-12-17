@@ -1,12 +1,9 @@
-use darling::{ast::Fields, FromDeriveInput, FromField, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, Data, DataStruct, DeriveInput, Generics};
+use syn::{spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Generics, LitStr};
 
 use std::collections::HashSet;
-
-use crate::find_meta_attrs;
 
 #[derive(Debug)]
 struct BinaryValueStruct {
@@ -14,14 +11,9 @@ struct BinaryValueStruct {
     attrs: BinaryValueAttrs,
 }
 
-impl FromDeriveInput for BinaryValueStruct {
-    fn from_derive_input(input: &DeriveInput) -> darling::Result<Self> {
-        let attrs = find_meta_attrs("binary_value", &input.attrs)
-            .map_or_else(
-                || Ok(BinaryValueAttrs::default()),
-                |meta| BinaryValueAttrs::from_nested_meta(&meta),
-            )?;
-
+impl BinaryValueStruct {
+    fn new(input: &DeriveInput) -> syn::Result<Self> {
+        let attrs = BinaryValueAttrs::new(&input.attrs)?;
         Ok(Self {
             ident: input.ident.clone(),
             attrs,
@@ -35,23 +27,42 @@ enum Codec {
     Bincode,
 }
 
-impl FromMeta for Codec {
-    fn from_string(value: &str) -> darling::Result<Self> {
+impl Codec {
+    fn from_string(value: &LitStr) -> syn::Result<Self> {
+        let parsed = value.value();
         #[allow(clippy::single_match_else)] // better for forward compatibility
-        match value {
+        match parsed.as_str() {
             "bincode" => Ok(Codec::Bincode),
             _ => {
-                let msg = format!("Unknown codec ({value}). Use `bincode`");
-                Err(darling::Error::custom(msg))
+                let msg = format!("Unknown codec ({parsed}). Use `bincode`");
+                Err(syn::Error::new(value.span(), msg))
             }
         }
     }
 }
 
-#[derive(Debug, Default, FromMeta)]
+#[derive(Debug, Default)]
 struct BinaryValueAttrs {
-    #[darling(default)]
     codec: Codec,
+}
+
+impl BinaryValueAttrs {
+    fn new(attrs: &[Attribute]) -> syn::Result<Self> {
+        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("binary_value"));
+        let mut codec = Codec::default();
+        for attr in attrs {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("codec") {
+                    let val: LitStr = meta.value()?.parse()?;
+                    codec = Codec::from_string(&val)?;
+                    Ok(())
+                } else {
+                    Err(meta.error("Unsupported attribute"))
+                }
+            })?;
+        }
+        Ok(Self { codec })
+    }
 }
 
 impl BinaryValueStruct {
@@ -59,7 +70,7 @@ impl BinaryValueStruct {
         let name = &self.ident;
 
         quote! {
-            impl matterdb::BinaryValue for #name {
+            impl ::matterdb::BinaryValue for #name {
                 fn to_bytes(&self) -> std::vec::Vec<u8> {
                     bincode::serialize(self).expect(
                         concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
@@ -103,7 +114,7 @@ impl ToTokens for BinaryValueStruct {
 
 pub(crate) fn impl_binary_value(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
-    let db_object = BinaryValueStruct::from_derive_input(&input)
+    let db_object = BinaryValueStruct::new(&input)
         .unwrap_or_else(|e| panic!("BinaryValue: {e}"));
     let tokens = quote! { #db_object };
     tokens.into()
@@ -131,7 +142,6 @@ fn validate_address_component(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[derive(Debug)]
 struct FromAccess {
     ident: Ident,
     access_ident: Ident,
@@ -140,29 +150,68 @@ struct FromAccess {
     attrs: FromAccessAttrs,
 }
 
-#[derive(Debug, Default, FromMeta)]
+#[derive(Debug, Default)]
 struct FromAccessAttrs {
-    #[darling(default)]
     transparent: bool,
 }
 
-#[derive(Debug, Default, FromMeta)]
+impl FromAccessAttrs {
+    fn new(attrs: &[Attribute]) -> syn::Result<Self> {
+        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("from_access"));
+        let mut transparent = false;
+        for attr in attrs {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("transparent") {
+                    transparent = true;
+                    Ok(())
+                } else {
+                    Err(meta.error("Unsupported attribute"))
+                }
+            })?;
+        }
+        Ok(Self { transparent })
+    }
+}
+
+#[derive(Debug, Default)]
 struct FromAccessFieldAttrs {
-    #[darling(default)]
     rename: Option<String>,
-    #[darling(default)]
     flatten: bool,
 }
 
+impl FromAccessFieldAttrs {
+    fn new(attrs: &[Attribute]) -> syn::Result<Self> {
+        let attrs = attrs.iter().filter(|attr| attr.path().is_ident("from_access"));
+
+        let mut rename = None;
+        let mut flatten = false;
+        for attr in attrs {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename") {
+                    let val: LitStr = meta.value()?.parse()?;
+                    rename = Some(val.value());
+                    Ok(())
+                } else if meta.path.is_ident("flatten") {
+                    flatten = true;
+                    Ok(())
+                } else {
+                    Err(meta.error("Unsupported attribute"))
+                }
+            })?;
+        }
+        Ok(Self { rename, flatten })
+    }
+}
+
 impl FromAccess {
-    fn extract_access_ident(generics: &syn::Generics) -> darling::Result<&Ident> {
+    fn extract_access_ident(generics: &Generics) -> syn::Result<&Ident> {
         use syn::{TraitBound, TypeParamBound};
 
         for type_param in generics.type_params() {
             if type_param
                 .attrs
                 .iter()
-                .any(|attr| attr.path.is_ident("from_access"))
+                .any(|attr| attr.path().is_ident("from_access"))
             {
                 return Ok(&type_param.ident);
             }
@@ -181,12 +230,12 @@ impl FromAccess {
         // No type params with the overt attribute or `T: Access` constraint.
         let mut params = generics.type_params();
         let type_param = params.next().ok_or_else(|| {
-            darling::Error::custom("`FromAccess` struct should be generic over `Access` type")
+            syn::Error::new(generics.span(), "`FromAccess` struct should be generic over `Access` type")
         })?;
         if params.next().is_some() {
             let msg = "Cannot find type param implementing `Access` trait. \
                        You may mark it explicitly with `#[from_access]`";
-            let e = darling::Error::custom(msg);
+            let e = syn::Error::new(generics.span(), msg);
             Err(e)
         } else {
             // If there is a single type param, we hope it's the correct one.
@@ -195,27 +244,23 @@ impl FromAccess {
     }
 }
 
-impl FromDeriveInput for FromAccess {
-    fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
-        let attrs = find_meta_attrs("from_access", &input.attrs)
-            .map_or_else(
-                || Ok(FromAccessAttrs::default()),
-                |meta| FromAccessAttrs::from_nested_meta(&meta),
-            )?;
-
+impl FromAccess {
+    fn from_derive_input(input: &DeriveInput) -> syn::Result<Self> {
+        let attrs = FromAccessAttrs::new(&input.attrs)?;
         match &input.data {
             Data::Struct(DataStruct { fields, .. }) => {
                 let this = Self {
                     ident: input.ident.clone(),
                     access_ident: Self::extract_access_ident(&input.generics)?.clone(),
                     generics: input.generics.clone(),
-                    fields: Fields::try_from(fields)?.fields,
+                    fields: fields.iter().map(AccessField::new).collect::<syn::Result<_>>()?,
                     attrs,
                 };
 
                 if this.attrs.transparent {
                     if this.fields.len() != 1 {
-                        let e = darling::Error::custom(
+                        let e = syn::Error::new(
+                            input.ident.span(),
                             "Transparent struct must contain a single field",
                         );
                         return Err(e);
@@ -226,11 +271,11 @@ impl FromDeriveInput for FromAccess {
                     for field in &this.fields {
                         if let Some(ref name) = field.name_suffix {
                             validate_address_component(name).map_err(|msg| {
-                                darling::Error::custom(msg).with_span(&field.span)
+                                syn::Error::new(field.span, msg)
                             })?;
                             if !field_names.insert(name) {
                                 let e = "Duplicate field name";
-                                return Err(darling::Error::custom(e).with_span(&field.span));
+                                return Err(syn::Error::new(field.span, e));
                             }
                         } else if !field.flatten {
                             let msg = if this.fields.len() == 1 {
@@ -239,14 +284,14 @@ impl FromDeriveInput for FromAccess {
                             } else {
                                 "Unnamed fields necessitate #[from_access(rename = ...)]"
                             };
-                            let e = darling::Error::custom(msg).with_span(&field.span);
-                            return Err(e);
+                            return Err(syn::Error::new(field.span, msg));
                         }
                     }
                 }
                 Ok(this)
             }
-            _ => Err(darling::Error::unsupported_shape(
+            _ => Err(syn::Error::new_spanned(
+                input,
                 "`FromAccess` can be only implemented for structs",
             )),
         }
@@ -261,16 +306,10 @@ struct AccessField {
     flatten: bool,
 }
 
-impl FromField for AccessField {
-    fn from_field(field: &syn::Field) -> darling::Result<Self> {
+impl AccessField {
+    fn new(field: &syn::Field) -> syn::Result<Self> {
         let ident = field.ident.clone();
-
-        let attrs = find_meta_attrs("from_access", &field.attrs)
-            .map_or_else(
-                || Ok(FromAccessFieldAttrs::default()),
-                |meta| FromAccessFieldAttrs::from_nested_meta(&meta),
-            )?;
-
+        let attrs = FromAccessFieldAttrs::new(&field.attrs)?;
         let name_suffix = attrs
             .rename
             .or_else(|| ident.as_ref().map(ToString::to_string));
@@ -391,7 +430,7 @@ pub(crate) fn impl_from_access(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
     let from_access = match FromAccess::from_derive_input(&input) {
         Ok(access) => access,
-        Err(e) => return e.write_errors().into(),
+        Err(e) => return e.into_compile_error().into(),
     };
     let tokens = quote!(#from_access);
     tokens.into()
