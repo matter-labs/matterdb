@@ -88,9 +88,17 @@ pub trait Access: Clone {
     type Base: RawAccess;
 
     /// Gets index metadata at the specified address, or `None` if there is no index.
+    ///
+    /// # Errors
+    ///
+    /// Returns access errors.
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError>;
 
     /// Gets or creates a generic view with the specified address.
+    ///
+    /// # Errors
+    ///
+    /// Returns access errors.
     fn get_or_create_view(
         self,
         addr: IndexAddress,
@@ -349,13 +357,20 @@ pub trait FromAccess<T: Access>: Sized {
     ///
     /// # Return value
     ///
-    /// Returns the constructed object. An error should be returned if the object cannot be
-    /// constructed.
+    /// Returns the constructed object.
+    ///
+    /// # Errors
+    ///
+    /// An error should be returned if the object cannot be constructed.
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
 
     /// Constructs the object from the root of the `access`.
     ///
     /// The default implementation uses `Self::from_access()` with an empty address.
+    ///
+    /// # Errors
+    ///
+    /// Returns access errors.
     fn from_root(access: T) -> Result<Self, AccessError> {
         Self::from_access(access, IndexAddress::default())
     }

@@ -15,7 +15,6 @@ use matterdb::{access::AccessExt, BinaryValue, Fork, MapIndex, TemporaryDB};
 use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
 
 mod common;
-mod key;
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
@@ -51,7 +50,7 @@ where
             MapAction::Clear => {
                 map.clear();
             }
-            _ => unreachable!(),
+            MapAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -71,7 +70,7 @@ where
             MapAction::Clear => {
                 map.clear();
             }
-            _ => unreachable!(),
+            MapAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -90,7 +89,7 @@ fn compare_map(map: &MapIndex<Rc<Fork>, u8, i32>, ref_map: &HashMap<u8, i32>) ->
     for k in ref_map.keys() {
         prop_assert!(map.contains(k));
     }
-    for (k, v) in map.iter() {
+    for (k, v) in map {
         prop_assert_eq!(Some(&v), ref_map.get(&k));
     }
     Ok(())

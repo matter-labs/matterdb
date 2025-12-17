@@ -201,7 +201,7 @@ where
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.base.put(&len, value);
-        self.set_len(len + 1)
+        self.set_len(len + 1);
     }
 
     /// Removes the last element from the list and returns it, or returns `None`
@@ -308,15 +308,12 @@ where
     /// assert_eq!(Some(10), index.get(0));
     /// ```
     pub fn set(&mut self, index: u64, value: V) {
-        if index >= self.len() {
-            panic!(
-                "index out of bounds: \
-                 the len is {} but the index is {}",
-                self.len(),
-                index
-            );
-        }
-        self.base.put(&index, value)
+        assert!(
+            index < self.len(),
+            "index out of bounds: the len is {} but the index is {index}",
+            self.len()
+        );
+        self.base.put(&index, value);
     }
 
     /// Clears the list, removing all values.
@@ -348,7 +345,7 @@ where
     }
 
     fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.state.set(len);
     }
 }
 

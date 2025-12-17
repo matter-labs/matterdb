@@ -2,7 +2,7 @@ use std::{borrow::Cow, num::NonZeroU64};
 
 use crate::BinaryKey;
 
-pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
+pub(crate) fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)
 }
 
@@ -81,6 +81,7 @@ impl IndexAddress {
     /// let prefixed = addr.prepend_name("prefix");
     /// assert_eq!(prefixed.name(), "prefix.foo");
     /// ```
+    #[must_use]
     pub fn prepend_name(self, prefix: &str) -> Self {
         let name = if self.name.is_empty() {
             prefix.to_owned()
@@ -103,6 +104,7 @@ impl IndexAddress {
     /// let suffixed = addr.append_name("suffix");
     /// assert_eq!(suffixed.name(), "foo.suffix");
     /// ```
+    #[must_use]
     pub fn append_name(self, suffix: &str) -> Self {
         let name = if self.name.is_empty() {
             suffix.to_owned()
@@ -115,6 +117,7 @@ impl IndexAddress {
     }
 
     /// Appends a key to the `IndexAddress`.
+    #[must_use]
     pub fn append_key<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
         let bytes = if let Some(ref bytes) = self.id_in_group {
             concat_keys!(bytes, suffix)
@@ -213,8 +216,7 @@ impl IndexAddress {
     pub(super) fn migrate_qualified_name(qualified_name: &[u8]) -> &[u8] {
         debug_assert_eq!(
             qualified_name[0], MIGRATION_CHAR,
-            "Qualified name {:?} is not in migration",
-            qualified_name
+            "Qualified name {qualified_name:?} is not in migration"
         );
         &qualified_name[1..]
     }

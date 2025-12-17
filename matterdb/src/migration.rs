@@ -138,7 +138,7 @@ impl<T: RawAccessMut> Migration<T> {
     {
         self.clone()
             .get_or_create_view(addr.into(), IndexType::Tombstone)
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"));
     }
 }
 
@@ -425,13 +425,17 @@ impl MigrationHelper {
         Prefixed::new(&self.namespace, self.fork_ref().readonly())
     }
 
-    /// Merges the changes to the migrated data and the scratchpad to the database. Returns an error
-    /// if the merge has failed.
+    /// Merges the changes to the migrated data and the scratchpad to the database.
     ///
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the migration is aborted or merging the changes into the DB fails.
+    #[allow(clippy::missing_panics_doc)] // false positive
     pub fn merge(&mut self) -> Result<(), MigrationError> {
         let fork = self.fork.take().unwrap();
         let patch = fork.into_patch();
@@ -446,9 +450,13 @@ impl MigrationHelper {
 
     /// Executes the provided closure in a loop until all persistent iterators instantiated
     /// within the closure have ended. After each iteration, the changes in migrated data are
-    /// merged to the database; an error is returned if this merge fails.
+    /// merged to the database.
     ///
     /// If no iterators are instantiated within the closure, a single iteration will be performed.
+    ///
+    /// # Errors
+    /// 
+    /// An error is returned if the DB merge fails on any iteration.
     pub fn iter_loop(
         &mut self,
         mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<&Fork>>),
@@ -470,6 +478,11 @@ impl MigrationHelper {
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the migration is aborted or merging the changes into the DB fails.
+    #[allow(clippy::missing_panics_doc)] // false positive
     pub fn finish(mut self) -> Result<(), MigrationError> {
         let patch = self.fork.take().unwrap().into_patch();
         if self.is_aborted() {
@@ -563,7 +576,7 @@ impl AbortHandle {
 /// this requirement would be violated is as follows:
 ///
 /// 1. Start a database migration in a separate thread, constructing a `MigrationHelper` around
-///   `Arc<dyn Database>`.
+///    `Arc<dyn Database>`.
 /// 2. Create a fork.
 /// 3. Ensure that the migration is complete via some synchronization primitive.
 /// 4. Call `flush_migration` on the fork from step 2.

@@ -104,19 +104,19 @@ where
     assert_eq!(val, val2);
     // Runs benchmarks.
     c.bench_function(
-        &format!("encoding/{}/to_bytes", name),
+        &format!("encoding/{name}/to_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.to_bytes()));
         },
     );
     c.bench_function(
-        &format!("encoding/{}/into_bytes", name),
+        &format!("encoding/{name}/into_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.into_bytes()));
         },
     );
     c.bench_function(
-        &format!("encoding/{}/from_bytes", name),
+        &format!("encoding/{name}/from_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(
                 || {
@@ -129,7 +129,7 @@ where
     );
 }
 
-pub fn bench_encoding(c: &mut Criterion) {
+pub(crate) fn bench_encoding(c: &mut Criterion) {
     bench_binary_value(c, "bytes", gen_bytes_data);
     bench_binary_value(c, "simple", gen_sample_data);
     bench_binary_value(c, "cursor", gen_cursor_data);

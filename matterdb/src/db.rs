@@ -94,7 +94,7 @@ impl WorkingPatchRef<'_> {
     fn patch(&self) -> &WorkingPatch {
         match self {
             WorkingPatchRef::Borrowed(patch) => patch,
-            WorkingPatchRef::Owned(ref fork) => &fork.working_patch,
+            WorkingPatchRef::Owned(fork) => &fork.working_patch,
         }
     }
 }
@@ -117,7 +117,7 @@ impl Deref for ChangesRef<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
-        &*self.inner
+        &self.inner
     }
 }
 
@@ -186,11 +186,10 @@ impl WorkingPatch {
         if let Some(ref view_changes) = view_changes {
             assert!(
                 Rc::strong_count(view_changes) == 1,
-                "Attempting to borrow {:?} mutably while it's borrowed immutably",
-                address
+                "Attempting to borrow {address:?} mutably while it's borrowed immutably"
             );
         } else {
-            panic!("Multiple mutable borrows of an index at {:?}", address);
+            panic!("Multiple mutable borrows of an index at {address:?}");
         }
         view_changes
     }
@@ -210,8 +209,7 @@ impl WorkingPatch {
                 // If the `changes` are `None`, this means they have been taken by a previous call
                 // to `take_view_changes` and not yet returned.
                 panic!(
-                    "Attempting to borrow {:?} immutably while it's borrowed mutably",
-                    address
+                    "Attempting to borrow {address:?} immutably while it's borrowed mutably"
                 );
             })
             .clone()
@@ -229,16 +227,14 @@ impl WorkingPatch {
             // since they borrow `Fork` immutably.
             let changes = changes.unwrap_or_else(|| {
                 panic!(
-                    "changes are still mutably borrowed at address {:?}",
-                    address
+                    "changes are still mutably borrowed at address {address:?}"
                 );
             });
             // Check that changes are not borrowed immutably (in this case, there is another
             // `Rc<_>` pointer to changes somewhere).
             let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
                 panic!(
-                    "changes are still immutably borrowed at address {:?}",
-                    address
+                    "changes are still immutably borrowed at address {address:?}"
                 );
             });
 
@@ -249,7 +245,7 @@ impl WorkingPatch {
             let patch_changes = patch
                 .changes
                 .entry(address)
-                .or_insert_with(ViewChanges::new);
+                .or_default();
             if changes.is_cleared() {
                 *patch_changes = changes;
             } else {
@@ -265,7 +261,7 @@ pub type Iter<'a> = Box<dyn Iterator + 'a>;
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(Eq, Hash))] // needed for patch equality comparison
-pub enum Change {
+pub(crate) enum Change {
     /// Put the specified value into the storage for the corresponding key.
     Put(Vec<u8>),
     /// Delete a value from the storage for the corresponding key.
@@ -648,6 +644,7 @@ pub trait Snapshot: Send + Sync + 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
+    #[allow(clippy::iter_not_returning_iterator)]
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
 }
 
@@ -694,7 +691,7 @@ impl Snapshot for Patch {
                 .range::<[u8], _>((Bound::Included(from), Bound::Unbounded))
         });
 
-        let is_cleared = maybe_changes.map_or(false, ViewChanges::is_cleared);
+        let is_cleared = maybe_changes.is_some_and(ViewChanges::is_cleared);
         if is_cleared {
             // Ignore all changes from the snapshot.
             Box::new(ChangesIter::new(changes_iter.unwrap()))
@@ -867,7 +864,7 @@ impl RawAccess for Rc<Fork> {
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
 
-impl<'a> AsReadonly for ReadonlyFork<'a> {
+impl AsReadonly for ReadonlyFork<'_> {
     type Readonly = Self;
 
     fn as_readonly(&self) -> Self::Readonly {
@@ -879,7 +876,7 @@ impl<'a> AsReadonly for &'a Fork {
     type Readonly = ReadonlyFork<'a>;
 
     fn as_readonly(&self) -> Self::Readonly {
-        ReadonlyFork(*self)
+        ReadonlyFork(self)
     }
 }
 
@@ -977,7 +974,7 @@ impl<'a, T> ForkIter<'a, T>
 where
     T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
-    pub fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
+    pub(crate) fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
         ForkIter {
             snapshot,
             changes: changes.map(StdIterator::peekable),
@@ -1112,14 +1109,14 @@ impl fmt::Debug for dyn Iterator {
 }
 
 /// The current `MerkleDB` data layout version.
-pub const DB_VERSION: u8 = 0;
+pub(crate) const DB_VERSION: u8 = 0;
 /// Database metadata address.
-pub const DB_METADATA: &str = "__DB_METADATA__";
+pub(crate) const DB_METADATA: &str = "__DB_METADATA__";
 /// Version attribute name.
-pub const VERSION_NAME: &str = "version";
+pub(crate) const VERSION_NAME: &str = "version";
 
 /// This function checks that the given database is compatible with the current `MerkleDB` version.
-pub fn check_database(db: &mut dyn Database) -> Result<()> {
+pub(crate) fn check_database(db: &mut dyn Database) -> Result<()> {
     let fork = db.fork();
     {
         let addr = ResolvedAddress::system(DB_METADATA);
@@ -1127,8 +1124,7 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             if saved_version != DB_VERSION {
                 return Err(Error::new(format!(
-                    "Database version doesn't match: actual {}, expected {}",
-                    saved_version, DB_VERSION
+                    "Database version doesn't match: actual {saved_version}, expected {DB_VERSION}"
                 )));
             }
 

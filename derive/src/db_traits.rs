@@ -17,8 +17,10 @@ struct BinaryValueStruct {
 impl FromDeriveInput for BinaryValueStruct {
     fn from_derive_input(input: &DeriveInput) -> darling::Result<Self> {
         let attrs = find_meta_attrs("binary_value", &input.attrs)
-            .map(|meta| BinaryValueAttrs::from_nested_meta(&meta))
-            .unwrap_or_else(|| Ok(BinaryValueAttrs::default()))?;
+            .map_or_else(
+                || Ok(BinaryValueAttrs::default()),
+                |meta| BinaryValueAttrs::from_nested_meta(&meta),
+            )?;
 
         Ok(Self {
             ident: input.ident.clone(),
@@ -27,23 +29,19 @@ impl FromDeriveInput for BinaryValueStruct {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 enum Codec {
+    #[default]
     Bincode,
-}
-
-impl Default for Codec {
-    fn default() -> Self {
-        Codec::Bincode
-    }
 }
 
 impl FromMeta for Codec {
     fn from_string(value: &str) -> darling::Result<Self> {
+        #[allow(clippy::single_match_else)] // better for forward compatibility
         match value {
             "bincode" => Ok(Codec::Bincode),
             _ => {
-                let msg = format!("Unknown codec ({}). Use `bincode`", value);
+                let msg = format!("Unknown codec ({value}). Use `bincode`");
                 Err(darling::Error::custom(msg))
             }
         }
@@ -103,17 +101,16 @@ impl ToTokens for BinaryValueStruct {
     }
 }
 
-pub fn impl_binary_value(input: TokenStream) -> TokenStream {
+pub(crate) fn impl_binary_value(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
-
     let db_object = BinaryValueStruct::from_derive_input(&input)
-        .unwrap_or_else(|e| panic!("BinaryValue: {}", e));
+        .unwrap_or_else(|e| panic!("BinaryValue: {e}"));
     let tokens = quote! { #db_object };
     tokens.into()
 }
 
 /// Checks that an ASCII character is allowed in the `IndexAddress` component.
-pub fn is_allowed_component_char(c: u8) -> bool {
+pub(crate) fn is_allowed_component_char(c: u8) -> bool {
     matches!(c, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_')
 }
 
@@ -128,8 +125,7 @@ fn validate_address_component(name: &str) -> Result<(), String> {
         .all(is_allowed_component_char)
     {
         return Err(format!(
-            "Name `{}` contains invalid chars (allowed: `A-Z`, `a-z`, `0-9`, `_` and `-`)",
-            name
+            "Name `{name}` contains invalid chars (allowed: `A-Z`, `a-z`, `0-9`, `_` and `-`)"
         ));
     }
     Ok(())
@@ -173,7 +169,7 @@ impl FromAccess {
         }
 
         for type_param in generics.type_params() {
-            for bound in type_param.bounds.iter() {
+            for bound in &type_param.bounds {
                 if let TypeParamBound::Trait(TraitBound { path, .. }) = bound {
                     if path.is_ident("Access") {
                         return Ok(&type_param.ident);
@@ -202,8 +198,10 @@ impl FromAccess {
 impl FromDeriveInput for FromAccess {
     fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
         let attrs = find_meta_attrs("from_access", &input.attrs)
-            .map(|meta| FromAccessAttrs::from_nested_meta(&meta))
-            .unwrap_or_else(|| Ok(FromAccessAttrs::default()))?;
+            .map_or_else(
+                || Ok(FromAccessAttrs::default()),
+                |meta| FromAccessAttrs::from_nested_meta(&meta),
+            )?;
 
         match &input.data {
             Data::Struct(DataStruct { fields, .. }) => {
@@ -268,8 +266,10 @@ impl FromField for AccessField {
         let ident = field.ident.clone();
 
         let attrs = find_meta_attrs("from_access", &field.attrs)
-            .map(|meta| FromAccessFieldAttrs::from_nested_meta(&meta))
-            .unwrap_or_else(|| Ok(FromAccessFieldAttrs::default()))?;
+            .map_or_else(
+                || Ok(FromAccessFieldAttrs::default()),
+                |meta| FromAccessFieldAttrs::from_nested_meta(&meta),
+            )?;
 
         let name_suffix = attrs
             .rename
@@ -387,7 +387,7 @@ impl ToTokens for FromAccess {
     }
 }
 
-pub fn impl_from_access(input: TokenStream) -> TokenStream {
+pub(crate) fn impl_from_access(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
     let from_access = match FromAccess::from_derive_input(&input) {
         Ok(access) => access,

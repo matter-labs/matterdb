@@ -1,8 +1,6 @@
 //! This crate provides macros for deriving some useful methods and traits for the MatterDB.
 
 #![recursion_limit = "128"]
-#![deny(unsafe_code, bare_trait_objects)]
-#![warn(missing_docs, missing_debug_implementations)]
 
 extern crate proc_macro;
 

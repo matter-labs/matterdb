@@ -205,8 +205,8 @@ impl ChangeSet for GenericChanges<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         match self {
             GenericChanges::None => None,
-            GenericChanges::Ref(changes) => Some(&*changes),
-            GenericChanges::Mut(changes) => Some(&*changes),
+            GenericChanges::Ref(changes) => Some(changes),
+            GenericChanges::Mut(changes) => Some(changes),
         }
     }
 

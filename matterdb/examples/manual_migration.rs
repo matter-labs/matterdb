@@ -11,7 +11,6 @@
 //! For the description of the common migration scenario, see the `migration` module docs.
 
 use matterdb::{access::Prefixed, migration::Migration, Database, Fork, ReadonlyFork};
-use std::sync::Arc;
 
 mod migration;
 
@@ -22,7 +21,7 @@ use crate::migration::{perform_migration, v1, v2};
 /// - `Wallet.public_key` field is removed.
 /// - `Wallet.history_hash` field is added.
 /// - Wallets and wallet history belonging to the users named "Eve' are dropped.
-fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork<'_>>) {
+fn migrate_wallets(new_data: &Migration<&Fork>, old_data: Prefixed<ReadonlyFork<'_>>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data.clone());
 
@@ -51,7 +50,7 @@ fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork<'
     }
 }
 
-fn manual_migration(db: Arc<dyn Database>) {
+fn manual_migration(db: &dyn Database) {
     // Create fork to apply changes to it.
     let fork = db.fork();
 
@@ -74,12 +73,12 @@ fn manual_migration(db: Arc<dyn Database>) {
 
     let new_data = Migration::new("test", &fork);
     let old_data = Prefixed::new("test", fork.readonly());
-    migrate_wallets(new_data, old_data);
+    migrate_wallets(&new_data, old_data);
 
     // Merge patch with migrated data.
     db.merge(fork.into_patch()).unwrap();
 }
 
 fn main() {
-    perform_migration(manual_migration);
+    perform_migration(|db| manual_migration(db.as_ref()));
 }

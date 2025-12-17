@@ -1,14 +1,16 @@
 //! Shared code among all migration examples. The migration follows the following scenario:
 //!
 //! 1. We create and fill database with random data according to schema defined in the
-//!   `migration::v1` module with the `create_initial_data` method.
+//!    `migration::v1` module with the `create_initial_data` method.
 //! 2. We perform migration from the `v1` schema to the `v2` schema
-//!   with the help of the `migrate` function.
-//!   The method transforms the data in the old schema to conform to the new schema.
-//!   The old data is **not** removed at this stage; rather, it exists alongside
-//!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
+//!    with the help of the `migrate` function.
+//!    The method transforms the data in the old schema to conform to the new schema.
+//!    The old data is **not** removed at this stage; rather, it exists alongside
+//!    the migrated data. This is useful in case the migration needs to be reverted for some reason.
 //! 3. We complete the migration by calling `flush_migration`. This moves the migrated data
-//!   to its intended place and removes the old data marked for removal.
+//!    to its intended place and removes the old data marked for removal.
+
+#![allow(clippy::wildcard_imports)]
 
 use matterdb_derive::{BinaryValue, FromAccess};
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -24,22 +26,22 @@ use matterdb::{
 
 const USER_COUNT: usize = 10_000;
 
-pub type PublicKey = u16;
-pub type Hash = u32;
+pub(crate) type PublicKey = u16;
+pub(crate) type Hash = u32;
 
-pub mod v1 {
+pub(crate) mod v1 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize, BinaryValue)]
     #[binary_value(codec = "bincode")]
-    pub struct Wallet {
+    pub(crate) struct Wallet {
         pub public_key: PublicKey, // << removed in `v2`
         pub username: String,
         pub balance: u32,
     }
 
     #[derive(Debug, FromAccess)]
-    pub struct Schema<T: Access> {
+    pub(crate) struct Schema<T: Access> {
         pub ticker: Entry<T::Base, String>,
         pub divisibility: Entry<T::Base, u8>,
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
@@ -47,13 +49,13 @@ pub mod v1 {
     }
 
     impl<T: Access> Schema<T> {
-        pub fn new(access: T) -> Self {
+        pub(crate) fn new(access: T) -> Self {
             Self::from_root(access).unwrap()
         }
 
-        pub fn print_wallets(&self) {
+        pub(crate) fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
-                println!("Wallet[{:?}] = {:?}", public_key, wallet);
+                println!("Wallet[{public_key:?}] = {wallet:?}");
                 println!(
                     "History = {:?}",
                     self.histories.get(&public_key).iter().collect::<Vec<_>>()
@@ -77,7 +79,7 @@ fn create_initial_data() -> TemporaryDB {
 
         let mut rng = thread_rng();
         for user_id in 0..USER_COUNT {
-            let public_key = user_id as u16;
+            let public_key = u16::try_from(user_id).unwrap();
             let username = (*NAMES.choose(&mut rng).unwrap()).to_string();
             let wallet = v1::Wallet {
                 public_key,
@@ -90,7 +92,7 @@ fn create_initial_data() -> TemporaryDB {
             schema
                 .histories
                 .get(&public_key)
-                .extend((0..history_len).map(|idx| idx as u32));
+                .extend(0..history_len);
         }
     }
 
@@ -99,12 +101,12 @@ fn create_initial_data() -> TemporaryDB {
     db
 }
 
-pub mod v2 {
+pub(crate) mod v2 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize, BinaryValue)]
     #[binary_value(codec = "bincode")]
-    pub struct Wallet {
+    pub(crate) struct Wallet {
         pub username: String,
         pub balance: u32,
         pub history_hash: Hash, // << new field
@@ -112,26 +114,26 @@ pub mod v2 {
 
     #[derive(Debug, Serialize, Deserialize, BinaryValue)]
     #[binary_value(codec = "bincode")]
-    pub struct Config {
+    pub(crate) struct Config {
         pub ticker: String,
         pub divisibility: u8,
     }
 
     #[derive(Debug, FromAccess)]
-    pub struct Schema<T: Access> {
+    pub(crate) struct Schema<T: Access> {
         pub config: Entry<T::Base, Config>,
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
         pub histories: Group<T, PublicKey, ListIndex<T::Base, Hash>>,
     }
 
     impl<T: Access> Schema<T> {
-        pub fn new(access: T) -> Self {
+        pub(crate) fn new(access: T) -> Self {
             Self::from_root(access).unwrap()
         }
 
-        pub fn print_wallets(&self) {
+        pub(crate) fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
-                println!("Wallet[{:?}] = {:?}", public_key, wallet);
+                println!("Wallet[{public_key:?}] = {wallet:?}");
                 println!(
                     "History = {:?}",
                     self.histories.get(&public_key).iter().collect::<Vec<_>>()
@@ -158,7 +160,7 @@ fn check_data_after_flush(snapshot: &dyn Snapshot) {
 }
 
 /// Performs common migration logic.
-pub fn perform_migration<F>(migrate: F)
+pub(crate) fn perform_migration<F>(migrate: F)
 where
     F: FnOnce(Arc<dyn Database>),
 {

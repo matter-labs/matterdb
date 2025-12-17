@@ -55,19 +55,19 @@ impl<V> Modifier<Vec<V>> for ListAction<V> {
             ListAction::Truncate(size) => {
                 let len = list.len();
                 if len > 0 {
-                    list.truncate(size as usize % len);
+                    list.truncate(usize::try_from(size).unwrap() % len);
                 }
             }
             ListAction::Set(idx, val) => {
                 let len = list.len();
                 if len > 0 {
-                    list[idx as usize % len] = val;
+                    list[usize::try_from(idx).unwrap() % len] = val;
                 }
             }
             ListAction::Clear => {
                 list.clear();
             }
-            _ => unreachable!(),
+            ListAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -99,7 +99,7 @@ impl<V: BinaryValue> Modifier<ListIndex<Rc<Fork>, V>> for ListAction<V> {
             ListAction::Clear => {
                 list.clear();
             }
-            _ => unreachable!(),
+            ListAction::MergeFork => unreachable!(),
         }
     }
 }

@@ -57,7 +57,7 @@ fn migrate_wallets(helper: &MigrationHelper) {
 
 fn migration_with_helper(db: Arc<dyn Database>) {
     // Creating helper to perform migration.
-    let helper = MigrationHelper::new(db.clone(), "test");
+    let helper = MigrationHelper::new(db, "test");
 
     {
         let old_data = helper.old_data();

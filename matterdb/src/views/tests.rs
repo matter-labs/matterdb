@@ -1,5 +1,3 @@
-#![allow(clippy::let_underscore_drop)]
-
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
@@ -653,25 +651,25 @@ fn clear_sibling_views() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Multiple mutable borrows")]
 fn two_mutable_borrows() {
     test_two_mutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Multiple mutable borrows")]
 fn two_mutable_prefixed_borrows() {
     test_two_mutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Attempting to borrow")]
 fn mutable_and_immutable_borrows() {
     test_mutable_and_immutable_borrows(&TemporaryDB::new(), IDX_NAME);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Attempting to borrow")]
 fn mutable_and_immutable_prefixed_borrows() {
     test_mutable_and_immutable_borrows(&TemporaryDB::new(), PREFIXED_IDX);
 }
@@ -1039,7 +1037,7 @@ fn invalid_name_panic() {
 
 fn assert_valid_name_url(name: &str) {
     let urlencoded: String = byte_serialize(name.as_bytes()).collect();
-    assert_eq!(is_valid_identifier(name), name == urlencoded)
+    assert_eq!(is_valid_identifier(name), name == urlencoded);
 }
 
 fn check_valid_name(name: &str) -> bool {

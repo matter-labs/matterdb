@@ -2,9 +2,9 @@
 
 use std::{borrow::Cow, io::Read};
 
-use anyhow::{self, format_err};
+use anyhow::{self, format_err, Context};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -56,13 +56,17 @@ pub trait BinaryValue: Sized {
     }
 
     /// Deserializes the value from the given bytes array.
+    ///
+    /// # Errors
+    ///
+    /// Should return an error if `bytes` do not represent a valid value.
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self>;
 }
 
 macro_rules! impl_binary_value_scalar {
     ($type:tt, $read:ident) => {
-        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
+            #[allow(clippy::cast_sign_loss)]
             fn to_bytes(&self) -> Vec<u8> {
                 vec![*self as u8]
             }
@@ -117,7 +121,7 @@ impl BinaryValue for () {
 #[allow(clippy::use_self)] // false positives
 impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
-        vec![*self as u8]
+        vec![(*self).into()]
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
@@ -127,7 +131,7 @@ impl BinaryValue for bool {
         match value[0] {
             0 => Ok(false),
             1 => Ok(true),
-            value => Err(format_err!("Invalid value for bool: {}", value)),
+            value => Err(format_err!("Invalid value for bool: {value}")),
         }
     }
 }
@@ -169,10 +173,11 @@ impl BinaryValue for DateTime<Utc> {
         let mut value = bytes.as_ref();
         let secs = value.read_i64::<LittleEndian>()?;
         let nanos = value.read_u32::<LittleEndian>()?;
-        Ok(Self::from_utc(
-            NaiveDateTime::from_timestamp(secs, nanos),
-            Utc,
-        ))
+        Utc.timestamp_opt(secs, nanos)
+            .single()
+            .with_context(|| {
+                format!("stored timestamp out of range: {secs}, {nanos}")
+            })
     }
 }
 
@@ -222,7 +227,7 @@ mod tests {
         ($name:ident, $type:tt) => {
             #[test]
             fn $name() {
-                let values = [$type::min_value(), 1, $type::max_value()];
+                let values = [$type::MIN, 1, $type::MAX];
                 assert_round_trip_eq(&values);
             }
         };
@@ -232,7 +237,7 @@ mod tests {
         ($name:ident, $type:tt) => {
             #[test]
             fn $name() {
-                let values = [$type::min_value(), -1, 0, 1, $type::max_value()];
+                let values = [$type::MIN, -1, 0, 1, $type::MAX];
                 assert_round_trip_eq(&values);
             }
         };
@@ -287,12 +292,11 @@ mod tests {
         use chrono::TimeZone;
 
         let times = [
-            Utc.timestamp(0, 0),
-            Utc.timestamp(13, 23),
+            Utc.timestamp_opt(0, 0).unwrap(),
+            Utc.timestamp_opt(13, 23).unwrap(),
             Utc::now(),
             Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
-            Utc.timestamp(0, 999_999_999),
-            Utc.timestamp(0, 1_500_000_000), // leap second
+            Utc.timestamp_opt(0, 999_999_999).unwrap(),
         ];
         assert_round_trip_eq(&times);
     }

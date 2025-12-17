@@ -66,7 +66,7 @@ pub trait CopyAccessExt: Access + Copy {
         I: FromAccess<Self>,
     {
         Group::from_access(self, IndexAddress::from_root(name))
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets an entry index with the specified address.
@@ -79,7 +79,7 @@ pub trait CopyAccessExt: Access + Copy {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        Entry::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+        Entry::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a list index with the specified address.
@@ -93,7 +93,7 @@ pub trait CopyAccessExt: Access + Copy {
         V: BinaryValue,
     {
         ListIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a map index with the specified address.
@@ -107,7 +107,7 @@ pub trait CopyAccessExt: Access + Copy {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+        MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a sparse list index with the specified address.
@@ -121,7 +121,7 @@ pub trait CopyAccessExt: Access + Copy {
         V: BinaryValue,
     {
         SparseListIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a key set index with the specified address.
@@ -135,7 +135,7 @@ pub trait CopyAccessExt: Access + Copy {
         K: BinaryKey + ?Sized,
     {
         KeySetIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets index type at the specified address, or `None` if there is no index.
@@ -144,7 +144,7 @@ pub trait CopyAccessExt: Access + Copy {
         I: Into<IndexAddress>,
     {
         self.get_index_metadata(addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
             .map(|metadata| metadata.index_type())
     }
 }
@@ -178,7 +178,7 @@ pub trait AccessExt: Access {
         I: FromAccess<Self>,
     {
         Group::from_access(self.clone(), IndexAddress::from_root(name))
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets an entry index with the specified address.
@@ -192,7 +192,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         Entry::from_access(self.clone(), addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a list index with the specified address.
@@ -206,7 +206,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         ListIndex::from_access(self.clone(), addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a map index with the specified address.
@@ -221,7 +221,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         MapIndex::from_access(self.clone(), addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a sparse list index with the specified address.
@@ -235,7 +235,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         SparseListIndex::from_access(self.clone(), addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets a key set index with the specified address.
@@ -249,7 +249,7 @@ pub trait AccessExt: Access {
         K: BinaryKey + ?Sized,
     {
         KeySetIndex::from_access(self.clone(), addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Gets index type at the specified address, or `None` if there is no index.
@@ -259,7 +259,7 @@ pub trait AccessExt: Access {
     {
         self.clone()
             .get_index_metadata(addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
             .map(|metadata| metadata.index_type())
     }
 }

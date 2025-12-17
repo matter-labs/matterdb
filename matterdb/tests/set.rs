@@ -57,7 +57,7 @@ where
                 set.remove(&v);
             }
             SetAction::Clear => set.clear(),
-            _ => unreachable!(),
+            SetAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -74,7 +74,7 @@ impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
             SetAction::Clear => {
                 set.clear();
             }
-            _ => unreachable!(),
+            SetAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -93,7 +93,7 @@ fn compare_key_set(set: &KeySetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> Te
     for k in ref_set {
         prop_assert!(set.contains(k));
     }
-    for k in set.iter() {
+    for k in set {
         prop_assert!(ref_set.contains(&k));
     }
     Ok(())

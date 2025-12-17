@@ -175,7 +175,7 @@ where
     F: Fn(&mut Bencher<'_>, usize) + 'static,
 {
     let mut group = c.benchmark_group(name);
-    for item_counts in ITEM_COUNTS.iter() {
+    for item_counts in &ITEM_COUNTS {
         group
             .bench_with_input(
                 BenchmarkId::from_parameter(item_counts),
@@ -230,7 +230,7 @@ fn bench_index_clearing(bencher: &mut Bencher<'_>) {
     }
 }
 
-pub fn bench_storage(c: &mut Criterion) {
+pub(crate) fn bench_storage(c: &mut Criterion) {
     // MapIndex
     bench_fn(c, "storage/plain_map/insert", plain_map_index_insert);
     bench_fn(c, "storage/plain_map/iter", plain_map_index_iter);

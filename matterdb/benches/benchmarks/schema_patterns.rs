@@ -65,16 +65,17 @@ where
         // Access hot index and group a few times.
         for &divisor in DIVISORS {
             let group_id = transaction.value % divisor;
+            let divisor = u32::try_from(divisor).unwrap();
             let mut list_in_group = self.hot_group.get(&group_id);
             list_in_group.push(transaction.value);
-            self.hot_index.put(&group_id, divisor as u32);
+            self.hot_index.put(&group_id, divisor);
 
             // Cold index / group are accessed only a fraction of the time.
             if group_id == 0 {
                 let cold_group_id = transaction.value % COLD_DIVISOR;
                 let mut list_in_group = self.cold_group.get(&cold_group_id);
                 list_in_group.push(transaction.value);
-                self.cold_index.put(&cold_group_id, divisor as u32);
+                self.cold_index.put(&cold_group_id, divisor);
             }
         }
 
@@ -123,16 +124,17 @@ where
         // Access hot index and group a few times.
         for &divisor in DIVISORS {
             let group_id = transaction.value % divisor;
+            let divisor = u32::try_from(divisor).unwrap();
             let mut list_in_group = self.hot_group.get(&group_id);
             list_in_group.push(transaction.value);
-            self.hot_index.put(&group_id, divisor as u32);
+            self.hot_index.put(&group_id, divisor);
 
             // Cold index / group are accessed only a fraction of the time.
             if group_id == 0 {
                 let cold_group_id = transaction.value % COLD_DIVISOR;
                 let mut list_in_group = self.cold_group.get(&cold_group_id);
                 list_in_group.push(transaction.value);
-                self.cold_index.get().put(&cold_group_id, divisor as u32);
+                self.cold_index.get().put(&cold_group_id, divisor);
             }
         }
 
@@ -198,16 +200,17 @@ where
 
         for &divisor in DIVISORS {
             let group_id = transaction.value % divisor;
+            let divisor = u32::try_from(divisor).unwrap();
             let mut list_in_group = self.hot_group(group_id);
             list_in_group.push(transaction.value);
-            hot_index.put(&group_id, divisor as u32);
+            hot_index.put(&group_id, divisor);
 
             // Cold index / group are accessed only a fraction of the time.
             if group_id == 0 {
                 let cold_group_id = transaction.value % COLD_DIVISOR;
                 let mut list_in_group = self.cold_group(cold_group_id);
                 list_in_group.push(transaction.value);
-                self.cold_index().put(&cold_group_id, divisor as u32);
+                self.cold_index().put(&cold_group_id, divisor);
             }
         }
 
@@ -233,8 +236,8 @@ fn gen_random_transactions(count: usize) -> Vec<Transaction> {
     let mut rng = StdRng::from_seed(SEED);
     (0..count)
         .map(|_| Transaction {
-            value: rng.gen(),
-            _payload: rng.gen(),
+            value: rng.r#gen(),
+            _payload: rng.r#gen(),
         })
         .collect()
 }
@@ -256,10 +259,10 @@ fn bench<T: ExecuteTransaction>(bencher: &mut Bencher<'_>, prefixed: bool) {
                 T::execute(black_box(&fork), transaction);
             }
         }
-    })
+    });
 }
 
-pub fn bench_schema_patterns(c: &mut Criterion) {
+pub(crate) fn bench_schema_patterns(c: &mut Criterion) {
     let mut group = c.benchmark_group("schema_patterns");
     group.bench_function("eager", |b| bench::<EagerStyle>(b, false));
     group.bench_function("lazy", |b| bench::<LazyStyle>(b, false));

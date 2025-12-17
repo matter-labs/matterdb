@@ -106,7 +106,7 @@ where
     pub fn get(&self, key: &K) -> I {
         let addr = self.prefix.clone().append_key(key);
         I::from_access(self.access.clone(), addr)
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 }
 

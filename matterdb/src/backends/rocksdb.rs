@@ -52,8 +52,7 @@ impl From<&DBOptions> for RocksDBOptions {
         defaults.set_max_total_wal_size(opts.max_total_wal_size.unwrap_or(0));
         if let Some(capacity) = opts.max_cache_size {
             defaults.set_row_cache(
-                &RocksDBCache::new_lru_cache(capacity)
-                    .expect("Failed to instantiate `Cache` for `RocksDB`"),
+                &RocksDBCache::new_lru_cache(capacity),
             );
         }
         defaults
@@ -81,6 +80,10 @@ impl RocksDB {
     /// If the database does not exist at the indicated path and the option
     /// `create_if_missing` is switched on in `DBOptions`, a new database will
     /// be created at the indicated path.
+    /// 
+    /// # Errors
+    /// 
+    /// Propagates I/O errors. Returns an error on incompatible MatterDB version.
     pub fn open<P: AsRef<Path>>(path: P, options: &DBOptions) -> crate::Result<Self> {
         let inner = {
             if let Ok(names) = rocksdb::DB::list_cf(&RocksDBOptions::default(), &path) {
@@ -104,6 +107,10 @@ impl RocksDB {
     /// Successfully created checkpoint can be opened using `RocksDB::open`.
     ///
     /// [`RocksDB` docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
+    /// 
+    /// # Errors
+    /// 
+    /// Propagates I/O errors.
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
         let guard = self.get_db_lock_guard();
         let checkpoint = Checkpoint::new(&*guard)?;
@@ -112,6 +119,7 @@ impl RocksDB {
     }
 
     /// Retrieves read lock guard containing underlying `rocksdb::DB`.
+    #[allow(clippy::missing_panics_doc)] // FIXME: make private?
     pub fn get_db_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Failed to get read lock to DB")
     }
@@ -131,7 +139,7 @@ impl RocksDB {
     /// Clears the column family completely, removing all keys from it.
     pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &ColumnFamily) {
         /// Some lexicographically large key.
-        const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
+        const LARGER_KEY: &[u8] = &[u8::MAX; 1_024];
 
         let db_reader = self.get_db_lock_guard();
         let mut iter = db_reader.raw_iterator_cf(cf);
@@ -147,7 +155,7 @@ impl RocksDB {
                     batch.delete_range_cf(cf, &[][..], LARGER_KEY);
                 } else {
                     batch.delete_range_cf(cf, &[][..], key);
-                    batch.delete_cf(cf, &key);
+                    batch.delete_cf(cf, key);
                 }
             }
         }
@@ -211,7 +219,6 @@ impl RocksDB {
     }
 
     #[allow(unsafe_code)]
-    #[allow(clippy::useless_transmute)]
     pub(super) fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
             // SAFETY:
@@ -221,7 +228,11 @@ impl RocksDB {
             // the snapshot (`*mut ffi::rocksdb_t`) is never changed, i.e., not affected
             // by potential incoherence if the `ShardedLock` is being concurrently written to.
             // FIXME: Investigate changing `rocksdb::Snapshot` / `DB` to remove `unsafe` (ECR-4273).
-            snapshot: unsafe { mem::transmute(self.get_db_lock_guard().snapshot()) },
+            snapshot: unsafe {
+                mem::transmute::<rocksdb::Snapshot<'_>, rocksdb::Snapshot<'static>>(
+                    self.get_db_lock_guard().snapshot(),
+                )
+            },
             db: Arc::clone(&self.db),
         }
     }
@@ -283,13 +294,13 @@ impl Snapshot for RocksDBSnapshot {
     }
 }
 
-impl<'a> Iterator for RocksDBIterator<'a> {
+impl Iterator for RocksDBIterator<'_> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if self.ended {
             return None;
         }
 
-        let (key, value) = self.iter.next()?;
+        let (key, value) = self.iter.next()?.expect("failed iterating over RocksDB");
         if let Some(ref prefix) = self.prefix {
             if &key[..ID_SIZE] != prefix {
                 self.ended = true;
@@ -312,7 +323,7 @@ impl<'a> Iterator for RocksDBIterator<'a> {
             return None;
         }
 
-        let (key, value) = self.iter.peek()?;
+        let (key, value) = self.iter.peek()?.as_ref().expect("failed iterating over RocksDB");
         let key = if let Some(prefix) = self.prefix {
             if key[..ID_SIZE] != prefix {
                 self.ended = true;
@@ -345,11 +356,11 @@ impl fmt::Debug for RocksDBSnapshot {
 }
 
 /// Generates the sequence of bytes lexicographically following the provided one. Assumes that
-/// the provided sequence is less than `[u8::max_value(); ID_SIZE]`.
+/// the provided sequence is less than `[u8::MAX; ID_SIZE]`.
 pub fn next_id_bytes(id_bytes: [u8; ID_SIZE]) -> [u8; ID_SIZE] {
     let mut next_id_bytes = id_bytes;
     for byte in next_id_bytes.iter_mut().rev() {
-        if *byte == u8::max_value() {
+        if *byte == u8::MAX {
             *byte = 0;
         } else {
             *byte += 1;

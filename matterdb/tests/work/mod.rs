@@ -13,14 +13,15 @@ use matterdb::{
 };
 
 /// Possible index names.
-pub const INDEX_NAMES: &[&str] = &[
+pub(crate) const INDEX_NAMES: &[&str] = &[
     "foo",
     "bar",
     "b",
     "overly_long_prefix_still_should_work_though",
 ];
 
-pub fn work_on_index<T>(
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn work_on_index<T>(
     fork: T,
     addr: IndexAddress,
     mut index_type: IndexType,
@@ -70,7 +71,7 @@ where
 }
 
 /// Generates an `IndexAddress` optionally placed in a group.
-pub fn generate_address() -> impl Strategy<Value = IndexAddress> {
+pub(crate) fn generate_address() -> impl Strategy<Value = IndexAddress> {
     let index_name = sample::select(INDEX_NAMES).prop_map(IndexAddress::from_root);
     prop_oneof![
         // Non-prefixed addresses
@@ -80,7 +81,7 @@ pub fn generate_address() -> impl Strategy<Value = IndexAddress> {
     ]
 }
 
-pub fn generate_index_type() -> impl Strategy<Value = IndexType> {
+pub(crate) fn generate_index_type() -> impl Strategy<Value = IndexType> {
     prop_oneof![
         strategy::Just(IndexType::Entry),
         strategy::Just(IndexType::List),
@@ -90,18 +91,19 @@ pub fn generate_index_type() -> impl Strategy<Value = IndexType> {
 
 /// Generates a value to place in the index. if `None` is generated, the index will be cleared
 /// instead.
-pub fn generate_value() -> impl Strategy<Value = Option<Vec<u8>>> {
+pub(crate) fn generate_value() -> impl Strategy<Value = Option<Vec<u8>>> {
     option::weighted(0.8, vec(0_u8..4, 1..=1))
 }
 
 #[derive(Debug, Clone)]
-pub struct IndexData {
-    pub ty: IndexType,
-    pub values: Vec<Vec<u8>>,
+pub(crate) struct IndexData {
+    pub(crate) ty: IndexType,
+    pub(crate) values: Vec<Vec<u8>>,
 }
 
 impl IndexData {
-    pub fn check<S>(&self, snapshot: S, addr: IndexAddress) -> TestCaseResult
+    #[allow(clippy::needless_pass_by_value)] // FIXME
+    pub(crate) fn check<S>(&self, snapshot: S, addr: IndexAddress) -> TestCaseResult
     where
         S: Access,
     {
