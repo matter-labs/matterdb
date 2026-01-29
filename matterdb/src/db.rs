@@ -147,13 +147,6 @@ impl Drop for ChangesMut<'_> {
 }
 
 impl WorkingPatch {
-    /// Creates a new empty patch.
-    fn new() -> Self {
-        Self {
-            changes: RefCell::new(HashMap::new()),
-        }
-    }
-
     /// Takes a cell with changes for a specific `View` out of the patch.
     /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
     fn take_view_changes(&self, address: &ResolvedAddress) -> ChangesCell {
@@ -471,7 +464,7 @@ pub trait Database: Send + Sync + 'static {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
             },
-            working_patch: WorkingPatch::new(),
+            working_patch: WorkingPatch::default(),
         }
     }
 
@@ -692,7 +685,7 @@ impl Fork {
     /// If no `flush` method had been called before, finalizes all changes that were
     /// made after creation of `Fork`.
     pub fn flush(&mut self) {
-        let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
+        let working_patch = mem::take(&mut self.working_patch);
         working_patch.merge_into(&mut self.patch);
     }
 
@@ -712,7 +705,7 @@ impl Fork {
     /// Rolls back all changes that were made after the latest execution
     /// of the `flush` method.
     pub fn rollback(&mut self) {
-        self.working_patch = WorkingPatch::new();
+        self.working_patch = WorkingPatch::default();
     }
 
     /// Rolls back the migration with the specified name. This will remove all indexes

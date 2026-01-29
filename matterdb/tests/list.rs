@@ -4,7 +4,7 @@
 
 //! Property testing for list index as a rust collection.
 
-use std::rc::Rc;
+use std::marker::PhantomData;
 
 use matterdb::{BinaryValue, Fork, ListIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
@@ -71,8 +71,8 @@ impl<V> Modifier<Vec<V>> for ListAction<V> {
     }
 }
 
-impl<V: BinaryValue> Modifier<ListIndex<Rc<Fork>, V>> for ListAction<V> {
-    fn modify(self, list: &mut ListIndex<Rc<Fork>, V>) {
+impl<V: BinaryValue> Modifier<ListIndex<&Fork, V>> for ListAction<V> {
+    fn modify(self, list: &mut ListIndex<&Fork, V>) {
         match self {
             ListAction::Push(val) => {
                 list.push(val);
@@ -103,13 +103,17 @@ impl<V: BinaryValue> Modifier<ListIndex<Rc<Fork>, V>> for ListAction<V> {
     }
 }
 
-impl<V: BinaryValue> FromFork for ListIndex<Rc<Fork>, V> {
-    fn from_fork(fork: Rc<Fork>) -> Self {
+struct ListIndexTest<V>(PhantomData<V>);
+
+impl<V: BinaryValue> FromFork for ListIndexTest<V> {
+    type Index<'a> = ListIndex<&'a Fork, V>;
+
+    fn from_fork(fork: &Fork) -> Self::Index<'_> {
         fork.get_list("test")
     }
 
-    fn clear(&mut self) {
-        self.clear();
+    fn clear(index: &mut Self::Index<'_>) {
+        index.clear();
     }
 }
 
@@ -125,7 +129,7 @@ fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
     ]
 }
 
-fn compare_list(list: &ListIndex<Rc<Fork>, i32>, ref_list: &Vec<i32>) -> TestCaseResult {
+fn compare_list(list: &ListIndex<&Fork, i32>, ref_list: &Vec<i32>) -> TestCaseResult {
     prop_assert!(ref_list.iter().copied().eq(list));
     Ok(())
 }
@@ -134,6 +138,6 @@ fn compare_list(list: &ListIndex<Rc<Fork>, i32>, ref_list: &Vec<i32>) -> TestCas
 fn compare_list_to_vec() {
     let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(&db, actions, compare_list)?;
+        compare_collections::<ListIndexTest<i32>, _, _>(&db, actions, compare_list)?;
     });
 }

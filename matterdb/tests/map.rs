@@ -2,7 +2,7 @@
 
 // cspell:ignore oneof
 
-use std::{collections::HashMap, hash::Hash, rc::Rc};
+use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 
 use matterdb::{BinaryValue, Fork, MapIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
@@ -54,11 +54,11 @@ where
     }
 }
 
-impl<V> Modifier<MapIndex<Rc<Fork>, u8, V>> for MapAction<u8, V>
+impl<V> Modifier<MapIndex<&Fork, u8, V>> for MapAction<u8, V>
 where
     V: BinaryValue,
 {
-    fn modify(self, map: &mut MapIndex<Rc<Fork>, u8, V>) {
+    fn modify(self, map: &mut MapIndex<&Fork, u8, V>) {
         match self {
             MapAction::Put(k, v) => {
                 map.put(&k, v);
@@ -74,17 +74,21 @@ where
     }
 }
 
-impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
-    fn from_fork(fork: Rc<Fork>) -> Self {
+struct MapTest<V>(PhantomData<V>);
+
+impl<V: BinaryValue> FromFork for MapTest<V> {
+    type Index<'a> = MapIndex<&'a Fork, u8, V>;
+
+    fn from_fork(fork: &Fork) -> Self::Index<'_> {
         fork.get_map("test")
     }
 
-    fn clear(&mut self) {
-        self.clear();
+    fn clear(index: &mut Self::Index<'_>) {
+        index.clear();
     }
 }
 
-fn compare_map(map: &MapIndex<Rc<Fork>, u8, i32>, ref_map: &HashMap<u8, i32>) -> TestCaseResult {
+fn compare_map(map: &MapIndex<&Fork, u8, i32>, ref_map: &HashMap<u8, i32>) -> TestCaseResult {
     for k in ref_map.keys() {
         prop_assert!(map.contains(k));
     }
@@ -107,6 +111,6 @@ fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
 fn compare_map_to_hash_map() {
     let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(&db, actions, compare_map)?;
+        compare_collections::<MapTest<i32>, _, _>(&db, actions, compare_map)?;
     });
 }
