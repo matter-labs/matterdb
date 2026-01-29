@@ -1,7 +1,7 @@
 # MatterDB
 
 [![Docs.rs](https://docs.rs/matterdb/badge.svg)](https://docs.rs/matterdb)
-![rust 1.45.0+ required](https://img.shields.io/badge/rust-1.45.0+-blue.svg?label=Required%20Rust)
+![rust 1.85.0+ required](https://img.shields.io/badge/rust-1.85.0+-blue.svg?label=Required%20Rust)
 
 **MatterDB** is a document-oriented persistent storage.
 Under the hood, MerkleDB uses RocksDB as a key-value storage.
@@ -26,7 +26,7 @@ Include `matterdb` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-matterdb = "1.0.0"
+matterdb = "2.0.0-pre"
 ```
 
 ## History notice

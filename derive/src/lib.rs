@@ -1,15 +1,12 @@
 //! This crate provides macros for deriving some useful methods and traits for the MatterDB.
 
 #![recursion_limit = "128"]
-#![deny(unsafe_code, bare_trait_objects)]
-#![warn(missing_docs, missing_debug_implementations)]
 
 extern crate proc_macro;
 
 mod db_traits;
 
 use proc_macro::TokenStream;
-use syn::{Attribute, NestedMeta};
 
 /// Derives `BinaryValue` trait. The target type must implement (de)serialization logic,
 /// which should be provided externally.
@@ -91,12 +88,4 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(FromAccess, attributes(from_access))]
 pub fn from_access(input: TokenStream) -> TokenStream {
     db_traits::impl_from_access(input)
-}
-
-pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {
-    args.as_ref()
-        .iter()
-        .filter_map(|a| a.parse_meta().ok())
-        .find(|m| m.path().is_ident(name))
-        .map(NestedMeta::from)
 }

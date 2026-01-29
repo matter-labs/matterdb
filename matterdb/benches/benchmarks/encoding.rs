@@ -1,10 +1,9 @@
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, fmt, hint::black_box};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use criterion::{black_box, Bencher, Criterion};
-use rand::{rngs::StdRng, RngCore, SeedableRng};
-
+use criterion::{Bencher, Criterion};
 use matterdb::BinaryValue;
+use rand::{RngCore, SeedableRng, rngs::StdRng};
 
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 32] = [100; 32];
@@ -69,7 +68,7 @@ fn gen_bytes_data() -> Vec<u8> {
 
 fn check_binary_value<T>(data: T) -> T
 where
-    T: BinaryValue + Debug + PartialEq,
+    T: BinaryValue + fmt::Debug + PartialEq,
 {
     let bytes = data.to_bytes();
     assert_eq!(T::from_bytes(bytes.into()).unwrap(), data);
@@ -95,7 +94,7 @@ fn gen_cursor_data() -> CursorData {
 fn bench_binary_value<F, V>(c: &mut Criterion, name: &str, f: F)
 where
     F: Fn() -> V + 'static + Clone + Copy,
-    V: BinaryValue + PartialEq + Debug,
+    V: BinaryValue + PartialEq + fmt::Debug,
 {
     // Checks that binary value is correct.
     let val = f();
@@ -104,19 +103,19 @@ where
     assert_eq!(val, val2);
     // Runs benchmarks.
     c.bench_function(
-        &format!("encoding/{}/to_bytes", name),
+        &format!("encoding/{name}/to_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.to_bytes()));
         },
     );
     c.bench_function(
-        &format!("encoding/{}/into_bytes", name),
+        &format!("encoding/{name}/into_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(f, |data| black_box(data.into_bytes()));
         },
     );
     c.bench_function(
-        &format!("encoding/{}/from_bytes", name),
+        &format!("encoding/{name}/from_bytes"),
         move |b: &mut Bencher<'_>| {
             b.iter_with_setup(
                 || {
@@ -129,7 +128,7 @@ where
     );
 }
 
-pub fn bench_encoding(c: &mut Criterion) {
+pub(crate) fn bench_encoding(c: &mut Criterion) {
     bench_binary_value(c, "bytes", gen_bytes_data);
     bench_binary_value(c, "simple", gen_sample_data);
     bench_binary_value(c, "cursor", gen_cursor_data);

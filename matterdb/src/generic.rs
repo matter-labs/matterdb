@@ -85,12 +85,12 @@
 use std::rc::Rc;
 
 use crate::{
+    BinaryKey, Fork, IndexAddress, IndexType, OwnedReadonlyFork, ReadonlyFork, ResolvedAddress,
+    Snapshot,
     access::{Access, AccessError, AsReadonly, Prefixed},
     db::{ChangesMut, ChangesRef, ViewChanges},
     migration::{Migration, Scratchpad},
     views::{ChangeSet, GroupKeys, IndexMetadata, RawAccess, RawAccessMut, ViewWithMetadata},
-    BinaryKey, Fork, IndexAddress, IndexType, OwnedReadonlyFork, ReadonlyFork, ResolvedAddress,
-    Snapshot,
 };
 
 /// Container for an arbitrary raw access. For `Fork`s and `Snapshot`s, this type provides
@@ -205,8 +205,8 @@ impl ChangeSet for GenericChanges<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         match self {
             GenericChanges::None => None,
-            GenericChanges::Ref(changes) => Some(&*changes),
-            GenericChanges::Mut(changes) => Some(&*changes),
+            GenericChanges::Ref(changes) => Some(changes),
+            GenericChanges::Mut(changes) => Some(changes),
         }
     }
 
@@ -414,8 +414,8 @@ mod tests {
         AsReadonly, GenericRawAccess, IntoErased, Migration, Prefixed, Rc, Scratchpad, Snapshot,
     };
     use crate::{
-        access::{AccessExt, CopyAccessExt},
         Database, TemporaryDB,
+        access::{AccessExt, CopyAccessExt},
     };
 
     #[test]

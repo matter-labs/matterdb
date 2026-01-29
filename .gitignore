@@ -9,11 +9,11 @@
 *.bak
 node_modules
 *.log
-target
-a.out 
+a.out
 .gitconfig
 tags
 *.orig
-Cargo.lock
 
+# Rust
+target
 *.proptest-regressions

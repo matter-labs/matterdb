@@ -1,7 +1,5 @@
 //! Persistent iterators.
 
-use anyhow::{bail, ensure};
-
 use std::{
     borrow::{Borrow, Cow},
     collections::HashSet,
@@ -9,10 +7,12 @@ use std::{
     iter::Peekable,
 };
 
+use anyhow::{bail, ensure};
+
 use crate::{
+    BinaryKey, BinaryValue, Entry,
     access::{Access, AccessExt, RawAccess, RawAccessMut},
     indexes::{Entries, IndexIterator},
-    BinaryKey, BinaryValue, Entry,
 };
 
 /// Persistent iterator position.
@@ -340,7 +340,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{AccessExt, IteratorPosition, PersistentIter, PersistentKeys};
-    use crate::{access::CopyAccessExt, migration::Scratchpad, Database, MapIndex, TemporaryDB};
+    use crate::{Database, MapIndex, TemporaryDB, access::CopyAccessExt, migration::Scratchpad};
 
     #[test]
     fn persistent_iter_for_map() {
@@ -355,7 +355,7 @@ mod tests {
         let iter = PersistentIter::new(&scratchpad, "map", &map);
         let mut count = 0;
         for (i, (key, value)) in iter.take(5).enumerate() {
-            assert_eq!(key, i as u32);
+            assert_eq!(key, u32::try_from(i).unwrap());
             assert_eq!(value, i.to_string());
             count += 1;
         }
@@ -369,7 +369,7 @@ mod tests {
         let iter = PersistentIter::new(&scratchpad, "map", &map);
         count = 0;
         for (i, (key, value)) in (5..).zip(iter) {
-            assert_eq!(key, i as u32);
+            assert_eq!(key, u32::try_from(i).unwrap());
             assert_eq!(value, i.to_string());
             count += 1;
         }

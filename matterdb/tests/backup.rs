@@ -1,17 +1,16 @@
 //! Tests `DatabaseExt::merge_with_backup()`.
 
+use std::collections::{HashMap, HashSet};
+
+use matterdb::{
+    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
+    access::{Access, AccessExt},
+};
 use proptest::{
     collection::vec,
     prop_assert, prop_oneof, proptest, strategy,
     strategy::Strategy,
     test_runner::{Config, TestCaseResult},
-};
-
-use std::collections::{HashMap, HashSet};
-
-use matterdb::{
-    access::{Access, AccessExt},
-    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
 };
 
 mod work;
@@ -43,7 +42,7 @@ fn generate_action() -> impl Strategy<Value = Action> + Clone {
     ]
 }
 
-fn check_index_does_not_exist<S: Access>(snapshot: S, addr: IndexAddress) -> TestCaseResult {
+fn check_index_does_not_exist<S: Access + Copy>(snapshot: S, addr: IndexAddress) -> TestCaseResult {
     if let Some(index_type) = snapshot.index_type(addr) {
         prop_assert!(false, "{:?}", index_type);
     }

@@ -1,17 +1,16 @@
-pub use self::{
-    address::{IndexAddress, ResolvedAddress},
-    metadata::{
-        BinaryAttribute, GroupKeys, IndexMetadata, IndexState, IndexType, IndexesPool,
-        ViewWithMetadata,
-    },
-};
-
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
+pub(crate) use self::metadata::{
+    BinaryAttribute, GroupKeys, IndexMetadata, IndexState, IndexesPool, ViewWithMetadata,
+};
+pub use self::{
+    address::{IndexAddress, ResolvedAddress},
+    metadata::IndexType,
+};
 use crate::{
+    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     views::address::key_bytes,
-    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
 mod address;
@@ -23,12 +22,12 @@ mod tests;
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 #[derive(Debug)]
-pub enum View<T: RawAccess> {
+pub(crate) enum View<T: RawAccess> {
     Real(ViewInner<T>),
     Phantom,
 }
 
-pub struct ViewInner<T: RawAccess> {
+pub(crate) struct ViewInner<T: RawAccess> {
     address: ResolvedAddress,
     index_access: T,
     changes: T::Changes,
@@ -39,11 +38,12 @@ impl<T: RawAccess> fmt::Debug for ViewInner<T> {
         formatter
             .debug_struct("ViewInner")
             .field("address", &self.address)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 /// Utility trait to provide optional references to `ViewChanges`.
+#[allow(unreachable_pub)] // FIXME: probably will be removed
 pub trait ChangeSet {
     fn as_ref(&self) -> Option<&ViewChanges>;
     /// Provides mutable reference to changes. The implementation for a `RawAccessMut` type
@@ -63,7 +63,7 @@ impl ChangeSet for () {
 
 impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
-        Some(&*self)
+        Some(self)
     }
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
@@ -72,7 +72,7 @@ impl ChangeSet for ChangesRef<'_> {
 
 impl ChangeSet for ChangesMut<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
-        Some(&*self)
+        Some(self)
     }
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         Some(&mut *self)
@@ -193,7 +193,7 @@ impl<T: RawAccess> ViewInner<T> {
             .as_ref()
             .map(|changes| changes.data.range::<[u8], _>((Included(from), Unbounded)));
 
-        let is_cleared = self.changes.as_ref().map_or(false, ViewChanges::is_cleared);
+        let is_cleared = self.changes.as_ref().is_some_and(ViewChanges::is_cleared);
         if is_cleared {
             // Ignore all changes from the snapshot.
             Box::new(ChangesIter::new(changes_iter.unwrap()))
@@ -254,7 +254,7 @@ impl<T: RawAccess> View<T> {
     }
 
     /// Returns a value of *any* type corresponding to the key of *any* type.
-    pub fn get<K, V>(&self, key: &K) -> Option<V>
+    pub(crate) fn get<K, V>(&self, key: &K) -> Option<V>
     where
         K: BinaryKey + ?Sized,
         V: BinaryValue,
@@ -266,7 +266,7 @@ impl<T: RawAccess> View<T> {
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
     /// *any* type.
-    pub fn contains<K>(&self, key: &K) -> bool
+    pub(crate) fn contains<K>(&self, key: &K) -> bool
     where
         K: BinaryKey + ?Sized,
     {
@@ -276,7 +276,7 @@ impl<T: RawAccess> View<T> {
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
     /// type is *any* key-value pair. An argument `subprefix` allows specifying a subset of keys
     /// for iteration.
-    pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<'_, K, V>
+    pub(crate) fn iter<P, K, V>(&self, subprefix: &P) -> Iter<'_, K, V>
     where
         P: BinaryKey + ?Sized,
         K: BinaryKey + ?Sized,
@@ -296,7 +296,7 @@ impl<T: RawAccess> View<T> {
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows specifying a subset of iteration.
-    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<'_, K, V>
+    pub(crate) fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> Iter<'_, K, V>
     where
         P: BinaryKey,
         F: BinaryKey + ?Sized,
@@ -340,8 +340,7 @@ impl<T: RawAccess> View<T> {
 
 impl<T: RawAccessMut> View<T> {
     fn changes_mut(&mut self) -> &mut ViewChanges {
-        const ACCESS_ERROR: &str =
-            "Attempt to modify a readonly view of the database using a generic access. \
+        const ACCESS_ERROR: &str = "Attempt to modify a readonly view of the database using a generic access. \
              The caller should check the access type before calling any mutable methods";
 
         match self {
@@ -351,7 +350,7 @@ impl<T: RawAccessMut> View<T> {
     }
 
     /// Inserts a key-value pair into the fork.
-    pub fn put<K, V>(&mut self, key: &K, value: V)
+    pub(crate) fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: BinaryKey + ?Sized,
         V: BinaryValue,
@@ -362,7 +361,7 @@ impl<T: RawAccessMut> View<T> {
     }
 
     /// Removes a key from the view.
-    pub fn remove<K>(&mut self, key: &K)
+    pub(crate) fn remove<K>(&mut self, key: &K)
     where
         K: BinaryKey + ?Sized,
     {
@@ -372,7 +371,7 @@ impl<T: RawAccessMut> View<T> {
     }
 
     /// Clears the view removing all its elements.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.changes_mut().clear();
     }
 }
@@ -390,7 +389,7 @@ impl BytesIterator for EmptyIterator {
     }
 }
 
-pub struct ChangesIter<'a, T: Iterator + 'a> {
+pub(crate) struct ChangesIter<'a, T: Iterator + 'a> {
     inner: Peekable<T>,
     _lifetime: PhantomData<&'a ()>,
 }
@@ -400,7 +399,7 @@ impl<'a, T> ChangesIter<'a, T>
 where
     T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
-    pub fn new(iterator: T) -> Self {
+    pub(crate) fn new(iterator: T) -> Self {
         ChangesIter {
             inner: iterator.peekable(),
             _lifetime: PhantomData,
@@ -415,7 +414,7 @@ where
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.inner.next() {
-                Some((key, &Change::Put(ref value))) => {
+                Some((key, Change::Put(value))) => {
                     return Some((key.as_slice(), value.as_slice()));
                 }
                 Some((_, &Change::Delete)) => {}
@@ -429,7 +428,7 @@ where
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.inner.peek() {
-                Some((key, Change::Put(ref value))) => {
+                Some((key, Change::Put(value))) => {
                     return Some((key.as_slice(), value.as_slice()));
                 }
                 Some((_, Change::Delete)) => {
@@ -453,7 +452,8 @@ where
 /// [`iter`]: struct.BaseIndex.html#method.iter
 /// [`iter_from`]: struct.BaseIndex.html#method.iter_from
 /// [`BaseIndex`]: struct.BaseIndex.html
-pub struct Iter<'a, K: ?Sized, V> {
+pub(crate) struct Iter<'a, K: ?Sized, V> {
+    #[allow(clippy::struct_field_names)] // TODO: rename to `base`
     base_iter: BytesIter<'a>,
     prefix: Vec<u8>,
     detach_prefix: bool,
@@ -462,7 +462,7 @@ pub struct Iter<'a, K: ?Sized, V> {
     _v: PhantomData<V>,
 }
 
-impl<'a, K: ?Sized, V> fmt::Debug for Iter<'a, K, V> {
+impl<K: ?Sized, V> fmt::Debug for Iter<'_, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Iter(..)")
     }
@@ -498,7 +498,7 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for Iter<'a, K, V>
+impl<K, V> Iterator for Iter<'_, K, V>
 where
     K: BinaryKey + ?Sized,
     V: BinaryValue,

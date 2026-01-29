@@ -1,29 +1,28 @@
 //! Tests that compare collections and corresponding rust types using proptest.
 
-use modifier::Modifier;
-use proptest::test_runner::TestCaseResult;
-
 use std::rc::Rc;
 
 use matterdb::{Database, Fork, TemporaryDB};
+use modifier::Modifier;
+use proptest::test_runner::TestCaseResult;
 
-// Max size of the generated sequence of actions.
-pub const ACTIONS_MAX_LEN: usize = 100;
+/// Max size of the generated sequence of actions.
+pub(crate) const ACTIONS_MAX_LEN: usize = 100;
 
-pub trait FromFork {
+pub(crate) trait FromFork {
     fn from_fork(fork: Rc<Fork>) -> Self;
     fn clear(&mut self);
 }
 
-pub enum ForkAction {
+pub(crate) enum ForkAction {
     Merge,
 }
 
-pub trait AsForkAction {
+pub(crate) trait AsForkAction {
     fn as_fork_action(&self) -> Option<ForkAction>;
 }
 
-pub fn compare_collections<A, R, T>(
+pub(crate) fn compare_collections<A, R, T>(
     db: &TemporaryDB,
     actions: &[A],
     compare: impl Fn(&T, &R) -> TestCaseResult,

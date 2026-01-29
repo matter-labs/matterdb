@@ -1,11 +1,10 @@
 //! Tests related to components and `FromAccess` derivation.
 
-use matterdb_derive::FromAccess;
-
 use matterdb::{
-    access::{Access, CopyAccessExt, FromAccess, RawAccessMut},
     BinaryKey, Database, Entry, Group, Lazy, ListIndex, MapIndex, TemporaryDB,
+    access::{Access, CopyAccessExt, FromAccess, RawAccessMut},
 };
+use matterdb_derive::FromAccess;
 
 #[derive(FromAccess)]
 struct Simple<Acc: Access> {

@@ -86,33 +86,16 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 //! [`Group`]: indexes/group/struct.Group.html
 
-#![warn(
-    missing_debug_implementations,
-    unsafe_code,
-    bare_trait_objects,
-    missing_docs
-)]
-#![warn(clippy::pedantic, clippy::nursery)]
-#![allow(
-    // Next `cast_*` lints don't give alternatives.
-    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names, clippy::upper_case_acronyms,
-    // '... may panic' lints.
-    clippy::indexing_slicing,
-    // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn, clippy::missing_panics_doc,
-    // Seems should be fixed in `thiserror` crate.
-    clippy::reversed_empty_ranges,
-)]
-
 // Re-exports for use in the derive macros.
 #[doc(hidden)]
 pub mod _reexports {
     pub use anyhow::Error;
 }
 
+// Workaround for 'Linked file at path {matterdb_path}/struct.MapIndex.html
+// does not exist!'
+#[doc(no_inline)]
+pub use self::indexes::{Entry, Group, KeySetIndex, ListIndex, MapIndex, SparseListIndex};
 pub use self::{
     backends::{
         rocksdb::{self, RocksDB},
@@ -129,10 +112,6 @@ pub use self::{
     values::BinaryValue,
     views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress},
 };
-// Workaround for 'Linked file at path {matterdb_path}/struct.MapIndex.html
-// does not exist!'
-#[doc(no_inline)]
-pub use self::indexes::{Entry, Group, KeySetIndex, ListIndex, MapIndex, SparseListIndex};
 
 #[macro_use]
 mod macros;

@@ -1,17 +1,18 @@
 //! An implementation of `TemporaryDB` database.
 
-use crossbeam::sync::ShardedLock;
-use smallvec::SmallVec;
 use std::{
-    collections::{btree_map::Range, BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, btree_map::Range},
     iter::{Iterator, Peekable},
     sync::Arc,
 };
 
+use crossbeam::sync::ShardedLock;
+use smallvec::SmallVec;
+
 use crate::{
-    backends::rocksdb::{next_id_bytes, ID_SIZE},
-    db::{check_database, Change, Iterator as DBIterator},
     Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
+    backends::rocksdb::{ID_SIZE, next_id_bytes},
+    db::{Change, Iterator as DBIterator, check_database},
 };
 
 type MemoryDB = HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
@@ -35,6 +36,7 @@ struct TemporaryDBIterator<'a> {
 
 impl TemporaryDB {
     /// Creates a new, empty database.
+    #[allow(clippy::missing_panics_doc)] // false positive
     pub fn new() -> Self {
         let mut db = HashMap::new();
 
@@ -46,6 +48,7 @@ impl TemporaryDB {
     }
 
     /// Clears the contents of the database.
+    #[allow(clippy::missing_panics_doc, clippy::missing_errors_doc)] // FIXME: always returns Ok(())
     pub fn clear(&self) -> crate::Result<()> {
         let mut rw_lock = self.inner.write().expect("Couldn't get read-write lock");
 
@@ -124,7 +127,7 @@ impl Database for TemporaryDB {
     }
 }
 
-impl<'a> DBIterator for TemporaryDBIterator<'a> {
+impl DBIterator for TemporaryDBIterator<'_> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if self.ended {
             return None;

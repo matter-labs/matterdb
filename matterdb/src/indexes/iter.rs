@@ -1,8 +1,8 @@
 //! Generic iterator types used by all indexes.
 
 use crate::{
-    views::{Iter, RawAccess, View},
     BinaryKey, BinaryValue,
+    views::{Iter, RawAccess, View},
 };
 
 /// Iterator over key-value pairs of an index.
@@ -82,7 +82,7 @@ where
     type Item = K::Owned;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(key, _)| key)
+        self.base_iter.next().map(|(key, ())| key)
     }
 }
 
@@ -104,7 +104,7 @@ where
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(_, value)| value)
+        self.base_iter.next().map(|((), value)| value)
     }
 }
 

@@ -6,10 +6,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryValue,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Values},
     views::{IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryValue,
 };
 
 /// A list of items where elements are added to the end of the list and are
@@ -201,7 +201,7 @@ where
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.base.put(&len, value);
-        self.set_len(len + 1)
+        self.set_len(len + 1);
     }
 
     /// Removes the last element from the list and returns it, or returns `None`
@@ -308,15 +308,12 @@ where
     /// assert_eq!(Some(10), index.get(0));
     /// ```
     pub fn set(&mut self, index: u64, value: V) {
-        if index >= self.len() {
-            panic!(
-                "index out of bounds: \
-                 the len is {} but the index is {}",
-                self.len(),
-                index
-            );
-        }
-        self.base.put(&index, value)
+        assert!(
+            index < self.len(),
+            "index out of bounds: the len is {} but the index is {index}",
+            self.len()
+        );
+        self.base.put(&index, value);
     }
 
     /// Clears the list, removing all values.
@@ -348,7 +345,7 @@ where
     }
 
     fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.state.set(len);
     }
 }
 
@@ -382,8 +379,8 @@ where
 mod tests {
     use super::{ListIndex, RawAccessMut};
     use crate::{
-        access::{AccessExt, CopyAccessExt},
         Database, Fork, TemporaryDB,
+        access::{AccessExt, CopyAccessExt},
     };
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {

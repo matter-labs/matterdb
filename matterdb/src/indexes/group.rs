@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryKey,
     access::{Access, AccessError, FromAccess},
     views::{AsReadonly, GroupKeys, IndexAddress},
-    BinaryKey,
 };
 
 // cspell:ignore foob
@@ -105,8 +105,7 @@ where
     /// If the index is present and has a wrong type.
     pub fn get(&self, key: &K) -> I {
         let addr = self.prefix.clone().append_key(key);
-        I::from_access(self.access.clone(), addr)
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+        I::from_access(self.access.clone(), addr).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 }
 
@@ -142,9 +141,9 @@ where
 mod tests {
     use super::{Access, AsReadonly, BinaryKey, FromAccess, Group};
     use crate::{
+        Database, ListIndex, TemporaryDB,
         access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},
-        Database, ListIndex, TemporaryDB,
     };
 
     #[test]

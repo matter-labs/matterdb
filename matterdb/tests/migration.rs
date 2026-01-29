@@ -8,20 +8,19 @@
 //! be fine if the test passes, but can lead to weird errors if it fails. In this case,
 //! move database initialization inside the test to extract the sequence of actions failing the test.
 
+use std::collections::HashMap;
+
+use matterdb::{
+    Database, IndexAddress, IndexType, Snapshot, TemporaryDB,
+    access::AccessExt,
+    migration::{Migration, flush_migration, rollback_migration},
+};
 use proptest::{
     bool,
     collection::vec,
     prop_oneof, proptest, sample, strategy,
     strategy::Strategy,
     test_runner::{Config, TestCaseResult},
-};
-
-use std::collections::HashMap;
-
-use matterdb::{
-    access::AccessExt,
-    migration::{flush_migration, rollback_migration, Migration},
-    Database, IndexAddress, IndexType, Snapshot, TemporaryDB,
 };
 
 mod work;

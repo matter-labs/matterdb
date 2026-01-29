@@ -12,13 +12,6 @@
 //!
 //! Each access kind is tested in the raw variation and within a `Prefixed` access.
 
-use proptest::{
-    collection::{hash_map, vec},
-    num, prop_assert, prop_assert_eq, prop_oneof, proptest, sample, strategy,
-    strategy::Strategy,
-    test_runner::TestCaseResult,
-};
-
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
@@ -26,10 +19,16 @@ use std::{
 };
 
 use matterdb::{
+    BinaryKey, BinaryValue, Database, Fork, IndexAddress, IndexType, Snapshot, TemporaryDB,
     access::{Access, AccessExt, Prefixed, RawAccessMut},
     generic::{ErasedAccess, IntoErased},
     indexes::IndexIterator,
-    BinaryKey, BinaryValue, Database, Fork, IndexAddress, IndexType, Snapshot, TemporaryDB,
+};
+use proptest::{
+    collection::{hash_map, vec},
+    num, prop_assert, prop_assert_eq, prop_oneof, proptest, sample, strategy,
+    strategy::Strategy,
+    test_runner::TestCaseResult,
 };
 
 /// Possible index names.
@@ -167,7 +166,7 @@ where
         }
 
         if self.extend_entries {
-            self.entries.extend(self.more_entries.drain(..));
+            self.entries.append(&mut self.more_entries);
         }
     }
 
@@ -255,7 +254,7 @@ where
 
     let large_starts = (10..64)
         .map(|pow| 1_u64 << pow)
-        .chain((0..10).map(|diff| u64::max_value() - diff));
+        .chain((0..10).map(|diff| u64::MAX - diff));
     for start in large_starts {
         prop_assert_eq!(index.index_iter(Some(&start)).count(), 0);
     }

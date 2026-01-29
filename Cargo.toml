@@ -1,5 +1,58 @@
 [workspace]
+resolver = "3"
 members = [
-    "derive",
-    "matterdb"
+  "derive",
+  "matterdb",
 ]
+
+[workspace.package]
+version = "2.0.0-pre"
+edition = "2024"
+rust-version = "1.85.0"
+authors = [
+  "The Exonum Team <contact@exonum.com>",
+  "The Matter Labs Team <hello@matterlabs.dev>",
+]
+repository = "https://github.com/matter-labs/matterdb"
+license = "Apache-2.0"
+keywords = ["rocksdb", "database", "typesafe"]
+categories = ["data-structures", "database"]
+
+[workspace.dependencies]
+# External dependencies
+anyhow = "1.0"
+assert_matches = "1.5"
+bincode = "2"
+byteorder = "1.5"
+chrono = "0.4.42"
+criterion = "0.8"
+crossbeam = "0.8.0"
+modifier = "0.1"
+proc-macro2 = "1.0"
+proptest = "1.9"
+quote = "1.0"
+rand = "0.9"
+rand_xorshift = "0.4.0"
+rocksdb = "0.24.0"
+rust_decimal = "1.0"
+serde = "1.0"
+smallvec = "1.15"
+syn = "2.0"
+tempfile = "3.2"
+thiserror = "2.0"
+url = "2.0"
+uuid = "1.19"
+version-sync = "0.9.5"
+
+# Workspace dependencoes
+matterdb-derive = { version = "=2.0.0-pre", path = "derive" }
+
+[workspace.lints.rust]
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+must_use_candidate = "allow"
+module_name_repetitions = "allow"

@@ -1,11 +1,11 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use matterdb::{DBOptions, Database, Fork, Patch, Result, RocksDB, Snapshot};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
-pub mod encoding;
-pub mod schema_patterns;
-pub mod storage;
+pub(crate) mod encoding;
+pub(crate) mod schema_patterns;
+pub(crate) mod storage;
 
 pub(super) struct BenchDB {
     _dir: TempDir,

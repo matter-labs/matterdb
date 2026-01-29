@@ -1,14 +1,14 @@
+use std::{borrow::Cow, convert::TryFrom, io::Error, mem, num::NonZeroU64, vec};
+
 use anyhow::{ensure, format_err};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
 
-use std::{borrow::Cow, convert::TryFrom, io::Error, mem, num::NonZeroU64, vec};
-
 use crate::{
+    BinaryKey, BinaryValue,
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
     views::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View},
-    BinaryKey, BinaryValue,
 };
 
 /// Name of the column family used to store `IndexesPool`.
@@ -17,7 +17,7 @@ const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 /// Type of an index supported by `MatterDB`.
 ///
 /// `IndexType` is used for type checking indexes when they are created/accessed.
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum IndexType {
     /// Non-merkelized map index.
@@ -36,6 +36,7 @@ pub enum IndexType {
     Tombstone = 254,
     /// Unknown index type.
     #[doc(hidden)]
+    #[default]
     Unknown = 255,
 }
 
@@ -61,7 +62,7 @@ impl TryFrom<u32> for IndexType {
 const INDEX_STATE_TAG: u32 = 0;
 
 /// A type that can be (de)serialized as a metadata value.
-pub trait BinaryAttribute: Sized {
+pub(crate) trait BinaryAttribute: Sized {
     /// Size of the value.
     fn size(&self) -> usize;
     /// Writes value to specified `buffer`.
@@ -90,7 +91,7 @@ impl BinaryAttribute for u64 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.write_u64::<LittleEndian>(*self).unwrap()
+        buffer.write_u64::<LittleEndian>(*self).unwrap();
     }
 
     fn read(mut buffer: &[u8]) -> Result<Self, Error> {
@@ -105,17 +106,11 @@ impl BinaryAttribute for Vec<u8> {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(self)
+        buffer.extend_from_slice(self);
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
         Ok(buffer.to_vec())
-    }
-}
-
-impl Default for IndexType {
-    fn default() -> Self {
-        Self::Unknown
     }
 }
 
@@ -149,10 +144,11 @@ where
             .unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
-        if let Some(ref state) = self.state {
+        if let Some(state) = &self.state {
             // Writes index state in TLV (tag, length, value) form.
             buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
-            buf.write_u32::<LittleEndian>(state.size() as u32).unwrap();
+            let size = state.size().try_into().expect("state size is too large");
+            buf.write_u32::<LittleEndian>(size).unwrap();
             state.write(&mut buf);
         }
         buf
@@ -165,7 +161,7 @@ where
             .ok_or_else(|| format_err!("IndexMetadata identifier is 0"))?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
         let index_type = IndexType::try_from(index_type)
-            .map_err(|_| format_err!("Unknown index type: {}", index_type))?;
+            .map_err(|_| format_err!("Unknown index type: {index_type}"))?;
 
         if bytes.is_empty() {
             // There are no tags in the metadata, correspondingly, no index state.
@@ -182,8 +178,7 @@ where
 
         ensure!(
             state_tag == INDEX_STATE_TAG,
-            "Attribute with unknown tag: {}",
-            state_tag
+            "Attribute with unknown tag: {state_tag}"
         );
         ensure!(bytes.len() >= state_len, "Index state is too short");
 
@@ -222,9 +217,8 @@ impl IndexMetadata {
             state: self.state.map(|state| {
                 V::read(&state).unwrap_or_else(|e| {
                     panic!(
-                        "Error while reading state for index with type {:?}: {}. \
-                         This can be caused by database corruption",
-                        index_type, e
+                        "Error while reading state for index with type {index_type:?}: {e}. \
+                         This can be caused by database corruption"
                     );
                 })
             }),
@@ -233,7 +227,7 @@ impl IndexMetadata {
 }
 
 #[derive(Debug)]
-pub struct IndexState<T, V> {
+pub(crate) struct IndexState<T, V> {
     metadata: IndexMetadata<V>,
     // Access is used to update metadata for the index. For phantom indexes, the access
     // is set to `None`.
@@ -246,7 +240,7 @@ where
     T: RawAccess,
     V: BinaryAttribute + Copy,
 {
-    pub fn get(&self) -> Option<V> {
+    pub(crate) fn get(&self) -> Option<V> {
         self.metadata.state
     }
 }
@@ -263,12 +257,12 @@ where
         }
     }
 
-    pub fn set(&mut self, state: V) {
+    pub(crate) fn set(&mut self, state: V) {
         self.metadata.state = Some(state);
         self.update_metadata_view();
     }
 
-    pub fn unset(&mut self) {
+    pub(crate) fn unset(&mut self) {
         self.metadata.state = None;
         self.update_metadata_view();
     }
@@ -276,7 +270,7 @@ where
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-pub struct IndexesPool<T: RawAccess>(View<T>);
+pub(crate) struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
     pub(crate) fn new(index_access: T) -> Self {
@@ -617,15 +611,15 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        vec, BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType,
-        IndexesPool, NonZeroU64,
-    };
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
-
     use std::collections::{BTreeSet, HashMap};
 
-    use rand::{seq::SliceRandom, thread_rng, Rng};
+    use rand::{Rng, seq::IndexedRandom};
+
+    use super::{
+        BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool,
+        NonZeroU64, vec,
+    };
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -747,11 +741,11 @@ mod tests {
         fork.get_entry(("te", "st")).set(0_u8);
         fork.get_entry("test_test").set(0_u8);
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
         let mut groups: HashMap<&'static str, BTreeSet<_>> = HashMap::new();
         for _ in 0..1_000 {
             let group = *GROUPS.choose(&mut rng).unwrap();
-            let prefix: u32 = rng.gen();
+            let prefix: u32 = rng.random();
             groups.entry(group).or_default().insert(prefix);
             fork.get_entry((group, &prefix)).set(0_u8);
         }
@@ -771,8 +765,7 @@ mod tests {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::{GroupKeys, IndexAddress, RawAccess};
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
+    use std::collections::{BTreeSet, HashMap};
 
     use proptest::{
         collection::vec,
@@ -781,7 +774,8 @@ mod prop_tests {
         test_runner::TestCaseResult,
     };
 
-    use std::collections::{BTreeSet, HashMap};
+    use super::{GroupKeys, IndexAddress, RawAccess};
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     const ACTIONS_MAX_LEN: usize = 30;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;
@@ -802,7 +796,7 @@ mod prop_tests {
         ("foo", Some(0)),
         ("foo", Some(1)),
         ("foo", Some(256)),
-        ("foo", Some(u32::max_value())),
+        ("foo", Some(u32::MAX)),
         ("foo_", None),
         ("foo1", Some(0)),
     ];

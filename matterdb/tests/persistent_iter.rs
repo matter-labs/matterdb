@@ -1,18 +1,17 @@
 //! Property testing for persistent iterators. The test checks that persistent iterators do not
 //! skip or duplicate items, and that multiple iterators over the same collection are independent.
 
+use matterdb::{
+    Database, Fork, IndexAddress, IndexType, TemporaryDB,
+    access::CopyAccessExt,
+    migration::{PersistentIter, PersistentKeys, Scratchpad, rollback_migration},
+};
 use proptest::{
     collection::vec, num, prop_assert_eq, prop_oneof, proptest, sample, strategy,
     strategy::Strategy, test_runner::TestCaseResult,
 };
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
-
-use matterdb::{
-    access::CopyAccessExt,
-    migration::{rollback_migration, PersistentIter, PersistentKeys, Scratchpad},
-    Database, Fork, IndexAddress, IndexType, TemporaryDB,
-};
 
 const ACTIONS_MAX_LEN: usize = 50;
 
@@ -38,17 +37,17 @@ impl Collection {
 
     fn fill(self, fork: &Fork, rng: &mut impl Rng) {
         let addr = self.get_address();
-        let item_count = rng.gen_range(25..100);
+        let item_count = rng.random_range(25..100);
         match self.ty {
             IndexType::List => {
                 let mut list = fork.get_list(addr);
-                list.extend((0..item_count).map(|_| rng.gen::<u64>()));
+                list.extend((0..item_count).map(|_| rng.random::<u64>()));
             }
             IndexType::SparseList => {
                 let mut list = fork.get_sparse_list(addr);
                 for _ in 0..item_count {
-                    let index = rng.gen::<u64>() % 256;
-                    let value = rng.gen::<u64>();
+                    let index = rng.random::<u64>() % 256;
+                    let value = rng.random::<u64>();
                     list.set(index, value);
                 }
             }
@@ -56,8 +55,8 @@ impl Collection {
             IndexType::Map => {
                 let mut map = fork.get_map(addr);
                 for _ in 0..item_count {
-                    let key = rng.gen::<u64>() & 0xffff;
-                    let value = rng.gen::<u64>();
+                    let key = rng.random::<u64>() & 0xffff;
+                    let value = rng.random::<u64>();
                     map.put(&key, value);
                 }
             }
@@ -65,7 +64,7 @@ impl Collection {
             IndexType::KeySet => {
                 let mut set = fork.get_key_set(addr);
                 for _ in 0..item_count {
-                    set.insert(&rng.gen::<u64>());
+                    set.insert(&rng.random::<u64>());
                 }
             }
 

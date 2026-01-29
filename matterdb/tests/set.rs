@@ -2,19 +2,18 @@
 
 //! Property testing for key set index and value set index as a rust collection.
 
+use std::{collections::HashSet, hash::Hash, rc::Rc};
+
+use matterdb::{Fork, KeySetIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
 use proptest::{
     collection::vec, prop_assert, prop_oneof, proptest, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use std::{collections::HashSet, hash::Hash, rc::Rc};
-
-use matterdb::{access::AccessExt, Fork, KeySetIndex, TemporaryDB};
-
 mod common;
 
-use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
+use crate::common::{ACTIONS_MAX_LEN, AsForkAction, ForkAction, FromFork, compare_collections};
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {
@@ -57,7 +56,7 @@ where
                 set.remove(&v);
             }
             SetAction::Clear => set.clear(),
-            _ => unreachable!(),
+            SetAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -74,7 +73,7 @@ impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
             SetAction::Clear => {
                 set.clear();
             }
-            _ => unreachable!(),
+            SetAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -93,7 +92,7 @@ fn compare_key_set(set: &KeySetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> Te
     for k in ref_set {
         prop_assert!(set.contains(k));
     }
-    for k in set.iter() {
+    for k in set {
         prop_assert!(ref_set.contains(&k));
     }
     Ok(())

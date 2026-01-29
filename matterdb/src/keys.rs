@@ -1,7 +1,7 @@
 //! A definition of `BinaryKey` trait and implementations for common types.
 
 use byteorder::{BigEndian, ByteOrder};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -99,18 +99,19 @@ impl BinaryKey for u8 {
 
 /// Uses encoding with the values mapped to `u8`
 /// by adding the corresponding constant (`128`) to the value.
+#[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)] // intentional
 impl BinaryKey for i8 {
     fn size(&self) -> usize {
         1
     }
 
     fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer[0] = self.wrapping_add(Self::min_value()) as u8;
+        buffer[0] = self.wrapping_add(Self::MIN) as u8;
         self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        buffer[0].wrapping_sub(Self::min_value() as u8) as Self
+        buffer[0].wrapping_sub(Self::MIN as u8) as Self
     }
 }
 
@@ -136,18 +137,19 @@ macro_rules! storage_key_for_ints {
 
         /// Uses big-endian encoding with the values mapped to the unsigned format
         /// by adding the corresponding constant to the value.
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_wrap)] // intentional
         impl BinaryKey for $itype {
             fn size(&self) -> usize {
                 $size
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, self.wrapping_add(Self::min_value()) as $utype);
+                BigEndian::$write_method(buffer, self.wrapping_add(Self::MIN) as $utype);
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer).wrapping_sub(Self::min_value() as $utype) as Self
+                BigEndian::$read_method(buffer).wrapping_sub(Self::MIN as $utype) as Self
             }
         }
     };
@@ -259,7 +261,9 @@ impl BinaryKey for DateTime<Utc> {
     fn read(buffer: &[u8]) -> Self::Owned {
         let secs = i64::read(&buffer[0..8]);
         let nanos = u32::read(&buffer[8..12]);
-        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+        Utc.timestamp_opt(secs, nanos)
+            .single()
+            .unwrap_or_else(|| panic!("stored timestamp out of range: {secs}, {nanos}"))
     }
 }
 
@@ -297,12 +301,12 @@ impl BinaryKey for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
-    use crate::access::CopyAccessExt;
-
     use std::{fmt::Debug, str::FromStr};
 
     use chrono::{Duration, TimeZone};
+
+    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
+    use crate::access::CopyAccessExt;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -310,12 +314,11 @@ mod tests {
     macro_rules! test_storage_key_for_int_type {
         (full $type:ident, $size:expr => $test_name:ident) => {
             #[test]
-            #[allow(clippy::replace_consts)]
             fn $test_name() {
                 use std::iter::once;
 
-                const MIN: $type = std::$type::MIN;
-                const MAX: $type = std::$type::MAX;
+                const MIN: $type = $type::MIN;
+                const MAX: $type = $type::MAX;
 
                 // Roundtrip
                 let mut buffer = [0_u8; $size];
@@ -337,14 +340,14 @@ mod tests {
         (fuzz $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
-                use rand::{distributions::Standard, thread_rng, Rng};
-                let rng = thread_rng();
+                use rand::{Rng, distr::StandardUniform};
+                let rng = rand::rng();
 
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];
-                let handpicked_vals = vec![$type::min_value(), $type::max_value()];
+                let handpicked_vals = vec![$type::MIN, $type::MAX];
                 for x in rng
-                    .sample_iter(&Standard)
+                    .sample_iter(&StandardUniform)
                     .take(FUZZ_SAMPLES)
                     .chain(handpicked_vals)
                 {
@@ -353,9 +356,12 @@ mod tests {
                 }
 
                 // Fuzzed ordering
-                let rng = thread_rng();
+                let rng = rand::rng();
                 let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
-                let mut vals: Vec<$type> = rng.sample_iter(&Standard).take(FUZZ_SAMPLES).collect();
+                let mut vals: Vec<$type> = rng
+                    .sample_iter(&StandardUniform)
+                    .take(FUZZ_SAMPLES)
+                    .collect();
                 vals.sort_unstable();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);
@@ -414,12 +420,11 @@ mod tests {
     #[test]
     fn test_storage_key_for_chrono_date_time_round_trip() {
         let times = [
-            Utc.timestamp(0, 0),
-            Utc.timestamp(13, 23),
+            Utc.timestamp_opt(0, 0).unwrap(),
+            Utc.timestamp_opt(13, 23).unwrap(),
             Utc::now(),
             Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
-            Utc.timestamp(0, 999_999_999),
-            Utc.timestamp(0, 1_500_000_000), // leap second
+            Utc.timestamp_opt(0, 999_999_999).unwrap(),
         ];
 
         assert_round_trip_eq(&times);
@@ -427,20 +432,24 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use rand::{thread_rng, Rng};
+        use rand::Rng;
 
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
-            let time1 = Utc.timestamp(
-                rng.gen::<i64>() % i64::from(i32::max_value()),
-                rng.gen::<u32>() % 1_000_000_000,
-            );
-            let time2 = Utc.timestamp(
-                rng.gen::<i64>() % i64::from(i32::max_value()),
-                rng.gen::<u32>() % 1_000_000_000,
-            );
+            let time1 = Utc
+                .timestamp_opt(
+                    rng.random::<i64>() % i64::from(i32::MAX),
+                    rng.random::<u32>() % 1_000_000_000,
+                )
+                .unwrap();
+            let time2 = Utc
+                .timestamp_opt(
+                    rng.random::<i64>() % i64::from(i32::MAX),
+                    rng.random::<u32>() % 1_000_000_000,
+                )
+                .unwrap();
             time1.write(&mut buffer1);
             time2.write(&mut buffer2);
             assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
@@ -452,8 +461,8 @@ mod tests {
         use crate::{Database, MapIndex, TemporaryDB};
 
         let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-        let x1 = Utc.timestamp(80, 0);
-        let x2 = Utc.timestamp(10, 0);
+        let x1 = Utc.timestamp_opt(80, 0).unwrap();
+        let x2 = Utc.timestamp_opt(10, 0).unwrap();
         let y1 = Utc::now();
         let y2 = y1 + Duration::seconds(10);
         let fork = db.fork();
@@ -470,19 +479,27 @@ mod tests {
         assert_eq!(index.get(&x2), Some(y2));
 
         assert_eq!(
-            index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(0, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x2, y2), (x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(20, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(80, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&Utc.timestamp_opt(90, 0).unwrap())
+                .collect::<Vec<_>>(),
             vec![]
         );
 
@@ -510,7 +527,7 @@ mod tests {
     #[test]
     fn test_u8_slice_key() {
         let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
-        for val in values.iter() {
+        for val in values {
             let mut buffer = get_buffer(*val);
             val.write(&mut buffer);
             let new_val = <[u8] as BinaryKey>::read(&buffer);
@@ -547,7 +564,7 @@ mod tests {
         T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + Debug,
         <T as ToOwned>::Owned: Debug,
     {
-        for original_value in values.iter() {
+        for original_value in values {
             let mut buffer = get_buffer(original_value);
             original_value.write(&mut buffer);
             let new_value = <T as BinaryKey>::read(&buffer);

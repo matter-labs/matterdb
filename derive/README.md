@@ -1,6 +1,6 @@
 # Procedural macros for matterdb
 
-![rust 1.45.0+ required](https://img.shields.io/badge/rust-1.45.0+-blue.svg?label=Required%20Rust)
+![rust 1.85.0+ required](https://img.shields.io/badge/rust-1.85.0+-blue.svg?label=Required%20Rust)
 
 This crate provides several procedural macros for MatterDB.
 
@@ -19,7 +19,7 @@ Include `matterdb-derive` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-matterdb-derive = "1.0.0"
+matterdb-derive = "2.0.0-pre"
 ```
 
 ## License

@@ -4,19 +4,18 @@
 
 //! Property testing for list index as a rust collection.
 
+use std::rc::Rc;
+
+use matterdb::{BinaryValue, Fork, ListIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
 use proptest::{
     collection::vec, num, prop_assert, prop_oneof, proptest, strategy, strategy::Strategy,
     test_runner::TestCaseResult,
 };
 
-use std::rc::Rc;
-
-use matterdb::{access::AccessExt, BinaryValue, Fork, ListIndex, TemporaryDB};
-
 mod common;
 
-use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
+use crate::common::{ACTIONS_MAX_LEN, AsForkAction, ForkAction, FromFork, compare_collections};
 
 #[derive(Debug, Clone)]
 enum ListAction<V> {
@@ -55,19 +54,19 @@ impl<V> Modifier<Vec<V>> for ListAction<V> {
             ListAction::Truncate(size) => {
                 let len = list.len();
                 if len > 0 {
-                    list.truncate(size as usize % len);
+                    list.truncate(usize::try_from(size).unwrap() % len);
                 }
             }
             ListAction::Set(idx, val) => {
                 let len = list.len();
                 if len > 0 {
-                    list[idx as usize % len] = val;
+                    list[usize::try_from(idx).unwrap() % len] = val;
                 }
             }
             ListAction::Clear => {
                 list.clear();
             }
-            _ => unreachable!(),
+            ListAction::MergeFork => unreachable!(),
         }
     }
 }
@@ -99,7 +98,7 @@ impl<V: BinaryValue> Modifier<ListIndex<Rc<Fork>, V>> for ListAction<V> {
             ListAction::Clear => {
                 list.clear();
             }
-            _ => unreachable!(),
+            ListAction::MergeFork => unreachable!(),
         }
     }
 }

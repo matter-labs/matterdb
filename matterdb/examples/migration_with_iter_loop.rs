@@ -13,11 +13,12 @@
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
-use matterdb::{
-    migration::{MigrationError, MigrationHelper},
-    Database,
-};
 use std::sync::Arc;
+
+use matterdb::{
+    Database,
+    migration::{MigrationError, MigrationHelper},
+};
 
 mod migration;
 
@@ -32,12 +33,13 @@ use crate::migration::{perform_migration, v1, v2};
 /// - `Wallet::history_hash` field will be added.
 /// - Wallets and history from username Eve will be removed.
 fn migrate_wallets(helper: &mut MigrationHelper) -> Result<(), MigrationError> {
+    // Size is selected so that we can safely store part of the migration in RAM.
+    const CHUNK_SIZE: usize = 1_000;
+
     helper.iter_loop(|helper, iters| {
         let old_schema = v1::Schema::new(helper.old_data());
         let mut new_schema = v2::Schema::new(helper.new_data());
 
-        // Size is selected so that we can safely store part of the migration in RAM.
-        const CHUNK_SIZE: usize = 1_000;
         let mut count = 0;
         for (public_key, wallet) in iters
             .create("wallets", &old_schema.wallets)
@@ -65,13 +67,13 @@ fn migrate_wallets(helper: &mut MigrationHelper) -> Result<(), MigrationError> {
             count += 1;
         }
 
-        println!("Processed chunk of {} wallets", count);
+        println!("Processed chunk of {count} wallets");
     })
 }
 
 fn migration_with_iter_loop(db: Arc<dyn Database>) {
     // Creating helper to perform migration.
-    let mut helper = MigrationHelper::new(db.clone(), "test");
+    let mut helper = MigrationHelper::new(db, "test");
 
     {
         let old_data = helper.old_data();

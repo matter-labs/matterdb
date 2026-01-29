@@ -1,14 +1,6 @@
 //! Macros useful for work with types that implement `BinaryKey` and `BinaryValue` traits.
 
-/// Fast concatenation of byte arrays and/or keys that implements
-/// `BinaryKey` trait.
-///
-/// ```
-/// let prefix = vec![0_u8; 10];
-/// let key = PublicKey::zero();
-///
-/// let _result = concat_keys!(prefix, key);
-/// ```
+/// Fast concatenation of byte arrays and/or keys that implements `BinaryKey` trait.
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (

@@ -69,10 +69,14 @@ where
     /// Panics if the object cannot be restored.
     pub fn get(&self) -> I {
         self.try_get()
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
     /// Tries to restore the object from the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns access errors (e.g., on the type mismatch).
     pub fn try_get(&self) -> Result<I, AccessError> {
         I::from_access(self.access.clone(), self.address.clone())
     }
@@ -83,7 +87,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     use super::{FromAccess, Lazy};
-    use crate::{access::AccessErrorKind, Database, IndexType, ListIndex, MapIndex, TemporaryDB};
+    use crate::{Database, IndexType, ListIndex, MapIndex, TemporaryDB, access::AccessErrorKind};
 
     #[test]
     fn lazy_initialization() {
@@ -116,6 +120,6 @@ mod tests {
                 actual: IndexType::List,
                 ..
             }
-        )
+        );
     }
 }

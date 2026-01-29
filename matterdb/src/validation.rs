@@ -70,8 +70,8 @@ mod test {
     use assert_matches::assert_matches;
 
     use crate::{
-        access::{AccessErrorKind, FromAccess},
         Database, ListIndex, TemporaryDB,
+        access::{AccessErrorKind, FromAccess},
     };
 
     #[test]

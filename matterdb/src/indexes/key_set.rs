@@ -7,10 +7,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    BinaryKey,
     access::{Access, AccessError, FromAccess},
     indexes::iter::{Entries, IndexIterator, Keys},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryKey,
 };
 
 /// A set of key items.
@@ -127,7 +127,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: &K) {
-        self.base.put(item, ())
+        self.base.put(item, ());
     }
 
     /// Removes a key from the set.
@@ -148,7 +148,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove(&mut self, item: &K) {
-        self.base.remove(item)
+        self.base.remove(item);
     }
 
     /// Clears the set, removing all values.
@@ -174,7 +174,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear()
+        self.base.clear();
     }
 }
 
@@ -207,7 +207,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::KeySetIndex;
-    use crate::{access::CopyAccessExt, Database, TemporaryDB};
+    use crate::{Database, TemporaryDB, access::CopyAccessExt};
 
     const INDEX_NAME: &str = "test_index_name";
 
