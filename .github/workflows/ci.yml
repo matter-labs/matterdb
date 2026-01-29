@@ -2,111 +2,94 @@ name: CI
 
 on:
   pull_request:
-    branches:
-     - '*'
+    branches: [ "*" ]
+  push:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: "always"
+  CARGO_INCREMENTAL: "0"
+  RUSTC_WRAPPER: "sccache"
+  SCCACHE_GHA_ENABLED: "true"
+  # Minimum supported Rust version.
+  msrv: 1.85.0
+  # Nightly Rust necessary for building docs.
+  nightly: nightly-2025-05-23
 
 jobs:
-  fmt:
-    name: Rustfmt
+  build-msrv:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.msrv }}
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Build libraries
+        run: cargo build --workspace --lib --all-features
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          components: rustfmt
-          profile: minimal
-          override: true
+          components: rustfmt, clippy, rust-src
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Run rustfmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Format
+        run: cargo fmt --all -- --config imports_granularity=Crate --config group_imports=StdExternalCrate --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
-  clippy:
-    name: Clippy
+      - name: Run tests
+        run: cargo test --workspace --all-features --all-targets
+      - name: Run doc tests
+        run: cargo test --workspace --all-features --doc
+
+  build-nightly:
+    needs:
+      - build
+      - build-msrv
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
-          components: clippy
-          profile: minimal
-          override: true
+          toolchain: ${{ env.nightly }}
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
-      - name: Run clippy
-        uses: actions-rs/clippy-check@v1
+      - name: Build libraries
+        run: cargo build --workspace --exclude vise-e2e-tests --lib --all-features
+
+      - name: Build docs
+        run: |
+          cargo clean --doc && \
+          cargo rustdoc -p matterdb-derive --all-features -- -D warnings --cfg docsrs && \
+          cargo rustdoc -p matterdb --all-features -- -D warnings --cfg docsrs
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        if: github.event_name == 'push' && github.ref_type == 'branch'
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -D warnings
-
-  audit:
-    name: Security audit
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  deadlinks:
-    name: Deadlinks
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Install deadlinks
-        run: cargo install cargo-deadlinks
-
-      - name: Cargo doc
-        run: cargo doc --no-deps
-
-      - name: Run deadlinks
-        run: cargo deadlinks --dir target/doc
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --examples --all
-
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+          branch: gh-pages
+          folder: target/doc
+          single-commit: true
