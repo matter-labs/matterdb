@@ -13,7 +13,7 @@ use std::{
 use crate::{
     Error, Result,
     validation::assert_valid_name_component,
-    views::{AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
+    views::{ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
 };
 
 /// Changes related to a specific `View`.
@@ -85,21 +85,6 @@ struct WorkingPatch {
 }
 
 #[derive(Debug)]
-enum WorkingPatchRef<'a> {
-    Borrowed(&'a WorkingPatch),
-    Owned(Rc<Fork>),
-}
-
-impl WorkingPatchRef<'_> {
-    fn patch(&self) -> &WorkingPatch {
-        match self {
-            WorkingPatchRef::Borrowed(patch) => patch,
-            WorkingPatchRef::Owned(fork) => &fork.working_patch,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct ChangesRef<'a> {
     inner: Rc<ViewChanges>,
     _lifetime: PhantomData<&'a ()>,
@@ -124,7 +109,7 @@ impl Deref for ChangesRef<'_> {
 /// `RefMut`, but dumber.
 #[derive(Debug)]
 pub struct ChangesMut<'a> {
-    parent: WorkingPatchRef<'a>,
+    parent: &'a WorkingPatch,
     key: ResolvedAddress,
     changes: Option<Rc<ViewChanges>>,
 }
@@ -151,7 +136,7 @@ impl DerefMut for ChangesMut<'_> {
 
 impl Drop for ChangesMut<'_> {
     fn drop(&mut self) {
-        let mut change_map = self.parent.patch().changes.borrow_mut();
+        let mut change_map = self.parent.changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
             panic!("insertion point for changes disappeared at {:?}", self.key);
         });
@@ -183,7 +168,7 @@ impl WorkingPatch {
             })
         };
 
-        if let Some(ref view_changes) = view_changes {
+        if let Some(view_changes) = &view_changes {
             assert!(
                 Rc::strong_count(view_changes) == 1,
                 "Attempting to borrow {address:?} mutably while it's borrowed immutably"
@@ -692,7 +677,7 @@ impl Snapshot for Patch {
     }
 }
 
-impl RawAccess for &'_ Patch {
+impl RawAccess for &Patch {
     type Changes = ();
 
     fn snapshot(&self) -> &dyn Snapshot {
@@ -700,14 +685,6 @@ impl RawAccess for &'_ Patch {
     }
 
     fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
-}
-
-impl AsReadonly for &'_ Patch {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        self
-    }
 }
 
 impl Fork {
@@ -763,20 +740,6 @@ impl Fork {
     }
 }
 
-impl From<Patch> for Fork {
-    /// Creates a fork based on the provided `patch` and `snapshot`.
-    ///
-    /// Note: using created fork to modify data already present in `patch` may lead
-    /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indexes.
-    fn from(patch: Patch) -> Self {
-        Self {
-            patch,
-            working_patch: WorkingPatch::new(),
-        }
-    }
-}
-
 impl<'a> RawAccess for &'a Fork {
     type Changes = ChangesMut<'a>;
 
@@ -789,24 +752,7 @@ impl<'a> RawAccess for &'a Fork {
         ChangesMut {
             changes,
             key: address.clone(),
-            parent: WorkingPatchRef::Borrowed(&self.working_patch),
-        }
-    }
-}
-
-impl RawAccess for Rc<Fork> {
-    type Changes = ChangesMut<'static>;
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        &self.patch
-    }
-
-    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
-        let changes = self.working_patch.take_view_changes(address);
-        ChangesMut {
-            changes,
-            key: address.clone(),
-            parent: WorkingPatchRef::Owned(Self::clone(self)),
+            parent: &self.working_patch,
         }
     }
 }
@@ -855,22 +801,6 @@ impl RawAccess for Rc<Fork> {
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
 
-impl AsReadonly for ReadonlyFork<'_> {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        *self
-    }
-}
-
-impl<'a> AsReadonly for &'a Fork {
-    type Readonly = ReadonlyFork<'a>;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        ReadonlyFork(self)
-    }
-}
-
 impl<'a> RawAccess for ReadonlyFork<'a> {
     type Changes = ChangesRef<'a>;
 
@@ -883,61 +813,6 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
             inner: self.0.working_patch.clone_view_changes(address),
             _lifetime: PhantomData,
         }
-    }
-}
-
-/// Version of `ReadonlyFork` with a static lifetime. Can be produced from an `Rc<Fork>` using
-/// the `AsReadonly` trait.
-///
-/// Beware that producing an instance increases the reference counter of the underlying fork.
-/// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
-/// `OwnedReadonlyFork` instances are dropped by this time.
-///
-/// [`Rc::try_unwrap`]: https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap
-///
-/// # Examples
-///
-/// ```
-/// # use matterdb::{access::AccessExt, AsReadonly, Database, OwnedReadonlyFork, TemporaryDB};
-/// # use std::rc::Rc;
-/// let db = TemporaryDB::new();
-/// let fork = Rc::new(db.fork());
-/// fork.get_list("list").extend(vec![1_u32, 2, 3]);
-/// let ro_fork: OwnedReadonlyFork = fork.as_readonly();
-/// let list = ro_fork.get_list::<_, u32>("list");
-/// assert_eq!(list.len(), 3);
-/// ```
-#[derive(Debug, Clone)]
-pub struct OwnedReadonlyFork(Rc<Fork>);
-
-impl RawAccess for OwnedReadonlyFork {
-    type Changes = ChangesRef<'static>;
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        &self.0.patch
-    }
-
-    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
-        ChangesRef {
-            inner: self.0.working_patch.clone_view_changes(address),
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl AsReadonly for OwnedReadonlyFork {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        self.clone()
-    }
-}
-
-impl AsReadonly for Rc<Fork> {
-    type Readonly = OwnedReadonlyFork;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        OwnedReadonlyFork(self.clone())
     }
 }
 
@@ -1130,10 +1005,7 @@ pub(crate) fn check_database(db: &mut dyn Database) -> Result<()> {
 mod tests {
     use std::collections::HashSet;
 
-    use super::{
-        AsReadonly, Change, Database, DatabaseExt, Fork, OwnedReadonlyFork, Patch, Rc,
-        ResolvedAddress, Snapshot, StdIterator, View,
-    };
+    use super::*;
     use crate::{TemporaryDB, access::CopyAccessExt};
 
     #[test]
@@ -1313,34 +1185,6 @@ mod tests {
         let backup = db.merge_with_backup(fork.into_patch()).unwrap();
         assert!(backup.index_type(("foo", &1_u8)).is_none());
         assert!(backup.get_list::<_, u32>(("foo", &1_u8)).is_empty());
-    }
-
-    #[test]
-    fn borrows_from_owned_forks() {
-        use crate::{Entry, access::AccessExt};
-
-        let db = TemporaryDB::new();
-        let fork = Rc::new(db.fork());
-        let readonly: OwnedReadonlyFork = fork.as_readonly();
-        // Modify an index via `fork`.
-        fork.get_list("list").extend(vec![1_i64, 2, 3]);
-        // Check that if both `CopyAccessExt` and `AccessExt` traits are in scope, the correct one
-        // is used for `Rc<Fork>`.
-        let mut entry: Entry<Rc<Fork>, _> = fork.get_entry("entry");
-        // Access the list via `readonly`.
-        let list = readonly.get_list::<_, i64>("list");
-        assert_eq!(list.len(), 3);
-        assert_eq!(list.get(1), Some(2));
-        assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![2, 3]);
-
-        entry.set("!".to_owned());
-        drop(entry);
-        let entry = readonly.get_entry::<_, String>("entry");
-        // Clone `readonly` access and get another `entry` instance.
-        let other_readonly = readonly;
-        let other_entry = other_readonly.get_entry::<_, String>("entry");
-        assert_eq!(entry.get().unwrap(), "!");
-        assert_eq!(other_entry.get().unwrap(), "!");
     }
 
     #[test]

@@ -78,8 +78,8 @@ use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::{assert_valid_name_component, check_index_valid_full_name},
     views::{
-        AsReadonly, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, RawAccessMut,
-        View, ViewWithMetadata,
+        GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, RawAccessMut, View,
+        ViewWithMetadata,
     },
 };
 
@@ -101,18 +101,6 @@ const SCRATCHPAD_NAME: &str = "__scratchpad__";
 pub struct Migration<T> {
     access: T,
     namespace: String,
-}
-
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Migration`.
-impl<T> Migration<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.namespace, self.access)
-    }
 }
 
 impl<T: RawAccess> Migration<T> {
@@ -163,7 +151,6 @@ impl<T: RawAccess> Access for Migration<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let mut prefixed_addr = base_addr.prepend_name(&self.namespace);
         prefixed_addr.set_in_migration();
@@ -181,18 +168,6 @@ impl<T: RawAccess> Access for Migration<T> {
 pub struct Scratchpad<T> {
     access: T,
     namespace: String,
-}
-
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Scratchpad`.
-impl<T> Scratchpad<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.namespace, self.access)
-    }
 }
 
 impl<T: RawAccess> Scratchpad<T> {
@@ -256,7 +231,6 @@ impl<T: RawAccess> Access for Scratchpad<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let base_addr = self.get_scratchpad_prefix(base_addr);
         self.access.group_keys(base_addr)

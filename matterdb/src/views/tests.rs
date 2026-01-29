@@ -1,4 +1,4 @@
-use std::{num::NonZeroU64, panic, rc::Rc};
+use std::{num::NonZeroU64, panic};
 
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
@@ -757,57 +757,6 @@ fn mutable_and_immutable_borrows_for_different_views() {
     assert_eq!(immutable_view2.get_bytes(&[1]), None);
 }
 
-#[test]
-fn views_based_on_rc_fork() {
-    fn test_lifetime<T: 'static>(_: T) {}
-
-    const IDX_1: (&str, u64) = ("foo", 23);
-    const IDX_2: (&str, u64) = ("foo", 42);
-
-    let db = TemporaryDB::new();
-    let fork = Rc::new(db.fork());
-
-    let view1 = View::new(fork.clone(), IDX_1);
-    let view2 = View::new(fork.clone(), IDX_2);
-    // Test that views have 'static lifetime.
-    test_lifetime(view1);
-    test_lifetime(view2);
-
-    let mut view1 = View::new(fork.clone(), IDX_1);
-    let mut view2 = View::new(fork.clone(), IDX_2);
-    view1.put(&vec![0], vec![1]);
-    view1.put(&vec![1], vec![2]);
-    assert_eq!(view1.get_bytes(&[0]), Some(vec![1]));
-    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
-    view2.put(&vec![0], vec![3]);
-    view1.put(&vec![0], vec![3]);
-    drop(view1);
-    view2.put(&vec![2], vec![4]);
-    drop(view2);
-
-    {
-        // Check that changes introduced by the both views are reflected in the fork.
-        let mut view1 = View::new(&*fork, IDX_1);
-        assert_eq!(view1.get_bytes(&[0]), Some(vec![3]));
-        view1.remove(&vec![0]);
-        let view2 = View::new(fork.clone(), IDX_2);
-        assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
-    }
-
-    // ...and that these changes propagate to patch.
-    let patch = Rc::try_unwrap(fork).unwrap().into_patch();
-    db.merge_sync(patch).unwrap();
-    let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
-
-    let view2 = View::new(&snapshot, IDX_2);
-    assert_eq!(view2.get_bytes(&[0]), Some(vec![3]));
-    assert_eq!(view2.get_bytes(&[1]), None);
-    assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
-}
-
 fn test_metadata(addr: impl Into<IndexAddress>) {
     let addr = addr.into();
     let db = TemporaryDB::new();
@@ -1047,35 +996,4 @@ fn check_valid_name(name: &str) -> bool {
         let _: ListIndex<_, u8> = fork.get_list(name.as_ref());
     }));
     catch_result.is_ok()
-}
-
-#[test]
-fn fork_from_patch() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    {
-        let mut index = fork.get_list("index");
-        index.push(1);
-        index.push(2);
-        index.push(3);
-        let last = index.pop();
-        assert_eq!(last, Some(3));
-        index.set(1, 5);
-    }
-
-    let patch = fork.into_patch();
-    let fork: Fork = patch.into();
-    {
-        let index = fork.get_list("index");
-        assert_eq!(index.get(0), Some(1));
-        assert_eq!(index.get(1), Some(5));
-        assert_eq!(index.get(2), None);
-
-        let items: Vec<i32> = index.iter().collect();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items, vec![1, 5]);
-    }
-
-    db.merge(fork.into_patch())
-        .expect("Fork created from patch should be merged successfully");
 }

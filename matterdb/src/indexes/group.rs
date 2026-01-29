@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     BinaryKey,
     access::{Access, AccessError, FromAccess},
-    views::{AsReadonly, GroupKeys, IndexAddress},
+    views::{GroupKeys, IndexAddress},
 };
 
 // cspell:ignore foob
@@ -112,7 +112,6 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: Access,
-    T::Base: AsReadonly<Readonly = T::Base>,
     K: BinaryKey + ?Sized,
 {
     /// Iterator over keys in this group.
@@ -139,7 +138,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Access, AsReadonly, BinaryKey, FromAccess, Group};
+    use super::*;
     use crate::{
         Database, ListIndex, TemporaryDB,
         access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
@@ -211,7 +210,6 @@ mod tests {
     fn test_key_iter<A>(snapshot: A)
     where
         A: Access,
-        A::Base: AsReadonly<Readonly = A::Base>,
     {
         let group: Group<_, str, ListIndex<_, String>> = snapshot.get_group("group");
         assert_eq!(

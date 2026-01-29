@@ -65,6 +65,7 @@ impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(self)
     }
+
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
     }
@@ -74,6 +75,7 @@ impl ChangeSet for ChangesMut<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(self)
     }
+
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         Some(&mut *self)
     }
@@ -128,15 +130,6 @@ pub trait RawAccessMut: RawAccess {}
 
 impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}
 
-/// Converts index access to a readonly presentation. The conversion operation is cheap.
-pub trait AsReadonly: RawAccess {
-    /// Readonly version of the access.
-    type Readonly: RawAccess;
-
-    /// Performs the conversion.
-    fn as_readonly(&self) -> Self::Readonly;
-}
-
 macro_rules! impl_snapshot_access {
     ($typ:ty) => {
         impl RawAccess for $typ {
@@ -148,19 +141,12 @@ macro_rules! impl_snapshot_access {
 
             fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
         }
-
-        impl AsReadonly for $typ {
-            type Readonly = Self;
-
-            fn as_readonly(&self) -> Self::Readonly {
-                self.clone()
-            }
-        }
     };
 }
 
-impl_snapshot_access!(&'_ dyn Snapshot);
-impl_snapshot_access!(&'_ Box<dyn Snapshot>);
+// FIXME: unnecessary?
+impl_snapshot_access!(&dyn Snapshot);
+impl_snapshot_access!(&Box<dyn Snapshot>);
 impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
 impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
@@ -339,6 +325,7 @@ impl<T: RawAccess> View<T> {
 }
 
 impl<T: RawAccessMut> View<T> {
+    // FIXME: outdated?
     fn changes_mut(&mut self) -> &mut ViewChanges {
         const ACCESS_ERROR: &str = "Attempt to modify a readonly view of the database using a generic access. \
              The caller should check the access type before calling any mutable methods";

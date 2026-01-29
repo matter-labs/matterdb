@@ -46,7 +46,7 @@ use std::fmt;
 use thiserror::Error;
 
 pub use self::extensions::{AccessExt, CopyAccessExt};
-pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
+pub use crate::views::{RawAccess, RawAccessMut};
 use crate::{
     BinaryKey,
     validation::assert_valid_name_component,
@@ -112,8 +112,7 @@ pub trait Access: Clone {
     /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
-        K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>;
+        K: BinaryKey + ?Sized;
 }
 
 impl<T: RawAccess> Access for T {
@@ -134,7 +133,6 @@ impl<T: RawAccess> Access for T {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         GroupKeys::new(self, &base_addr)
     }
@@ -168,18 +166,6 @@ impl<T: RawAccess> Access for T {
 pub struct Prefixed<T> {
     access: T,
     prefix: String,
-}
-
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Prefixed`.
-impl<T> Prefixed<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.prefix, self.access)
-    }
 }
 
 impl<T: RawAccess> Prefixed<T> {
@@ -217,7 +203,6 @@ impl<T: RawAccess> Access for Prefixed<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let prefixed_addr = base_addr.prepend_name(self.prefix.as_ref());
         self.access.group_keys(prefixed_addr)

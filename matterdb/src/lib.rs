@@ -101,16 +101,13 @@ pub use self::{
         rocksdb::{self, RocksDB},
         temporarydb::TemporaryDB,
     },
-    db::{
-        Database, DatabaseExt, Fork, Iter, Iterator, OwnedReadonlyFork, Patch, ReadonlyFork,
-        Snapshot,
-    },
+    db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     keys::BinaryKey,
     lazy::Lazy,
     options::DBOptions,
     values::BinaryValue,
-    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress},
+    views::{IndexAddress, IndexType, ResolvedAddress},
 };
 
 #[macro_use]
@@ -119,7 +116,6 @@ pub mod access;
 mod backends;
 mod db;
 mod error;
-pub mod generic;
 pub mod indexes;
 mod keys;
 mod lazy;
