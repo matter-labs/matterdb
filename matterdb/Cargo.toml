@@ -35,6 +35,7 @@ rand.workspace = true
 rand_xorshift.workspace = true
 url.workspace = true
 tempfile.workspace = true
+version-sync.workspace = true
 
 [[bench]]
 name = "criterion"

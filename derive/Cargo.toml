@@ -18,5 +18,8 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true
 
+[dev-dependencies]
+version-sync.workspace = true
+
 [lints]
 workspace = true
