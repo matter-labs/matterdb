@@ -104,7 +104,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let lazy_index: Lazy<_, ListIndex<_, u64>> =
-            Lazy::from_access(&snapshot, "lazy".into()).unwrap();
+            Lazy::from_access(snapshot.as_ref(), "lazy".into()).unwrap();
         assert_eq!(
             lazy_index.get().iter().collect::<Vec<_>>(),
             vec![1, 2, 3, 4]
@@ -112,7 +112,7 @@ mod tests {
 
         // Note that index type is not checked on `restore` / `ensure`, so the following is valid:
         let bogus: Lazy<_, MapIndex<_, u64, String>> =
-            Lazy::from_access(&snapshot, "lazy".into()).unwrap();
+            Lazy::from_access(snapshot.as_ref(), "lazy".into()).unwrap();
         // ...but this errors:
         assert_matches!(
             bogus.try_get().unwrap_err().kind,

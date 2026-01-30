@@ -156,8 +156,8 @@ fn _views_in_same_family<T: Database>(db: &T) {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    let view2 = View::new(&snapshot, IDX_2);
+    let view1 = View::new(snapshot.as_ref(), IDX_1);
+    let view2 = View::new(snapshot.as_ref(), IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -215,7 +215,7 @@ where
 
     {
         let snapshot = db.snapshot();
-        let view = View::new(&snapshot, address);
+        let view = View::new(snapshot.as_ref(), address);
 
         assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
         assert_iter(&view, 0, &[(1, 5), (3, 6)]);
@@ -247,7 +247,7 @@ where
 
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let view = View::new(&snapshot, address);
+    let view = View::new(snapshot.as_ref(), address);
     assert_iter(&view, 0, &[(3, 0), (4, 0)]);
     assert_iter(&view, 4, &[(4, 0)]);
 }
@@ -352,7 +352,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, ResolvedAddress::system(db::DB_METADATA));
+    let view = View::new(snapshot.as_ref(), ResolvedAddress::system(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -422,8 +422,8 @@ fn multiple_views() {
     {
         // Reading from a snapshot
         let snapshot = db.snapshot();
-        let view = View::new(&snapshot, IDX_NAME);
-        let prefixed_view = View::new(&snapshot, PREFIXED_IDX);
+        let view = View::new(snapshot.as_ref(), IDX_NAME);
+        let prefixed_view = View::new(snapshot.as_ref(), PREFIXED_IDX);
 
         assert_iter(&view, 0, &[(1, 10), (2, 20), (3, 30)]);
         assert_iter(&prefixed_view, 0, &[(1, 30), (3, 40), (5, 50)]);
@@ -530,8 +530,8 @@ fn views_in_same_family() {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    let view2 = View::new(&snapshot, IDX_2);
+    let view1 = View::new(snapshot.as_ref(), IDX_1);
+    let view2 = View::new(snapshot.as_ref(), IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -633,7 +633,7 @@ fn clear_sibling_views() {
     }
     db.merge(fork.into_patch()).unwrap();
 
-    assert_view_states(&db.snapshot());
+    assert_view_states(db.snapshot().as_ref());
 
     let fork = db.fork();
     assert_view_states(&fork);
@@ -766,14 +766,14 @@ fn test_metadata(addr: impl Into<IndexAddress>) {
         .map_err(drop)
         .unwrap();
     assert!(
-        ViewWithMetadata::get_or_create(&db.snapshot(), &addr, IndexType::Map)
+        ViewWithMetadata::get_or_create(db.snapshot().as_ref(), &addr, IndexType::Map)
             .unwrap()
             .is_phantom()
     );
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view = ViewWithMetadata::get_or_create(&snapshot, &addr, IndexType::Map).unwrap();
+    let view = ViewWithMetadata::get_or_create(snapshot.as_ref(), &addr, IndexType::Map).unwrap();
     assert_eq!(view.index_type(), IndexType::Map);
     assert!(!view.is_phantom());
 
@@ -891,7 +891,7 @@ fn test_metadata_index_wrong_type() {
     db.merge(fork.into_patch()).unwrap();
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
+    let err = ListIndex::<_, Vec<u8>>::from_access(snapshot.as_ref(), "simple".into()).unwrap_err();
 
     assert_matches!(
         err,
@@ -924,7 +924,7 @@ fn test_valid_tombstone() {
     // ...even after the fork is merged.
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let migration = Migration::new("foo", &snapshot);
+    let migration = Migration::new("foo", snapshot.as_ref());
     let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
     assert_matches!(
         err.kind,

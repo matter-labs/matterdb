@@ -382,11 +382,12 @@ mod tests {
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
+        let snapshot = snapshot.as_ref();
         let list = snapshot.get_list::<_, i32>("test.foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
 
-        let prefixed = Prefixed::new("test", &snapshot);
+        let prefixed = Prefixed::new("test", snapshot);
         let list = prefixed.get_list::<_, i32>("foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
@@ -410,10 +411,10 @@ mod tests {
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let foo_space = Prefixed::new("foo", &snapshot);
+        let foo_space = Prefixed::new("foo", snapshot.as_ref());
         let list = foo_space.get_list::<_, String>("test");
         assert_eq!(list.get(0), Some("Test".to_owned()));
-        let bar_space = Prefixed::new("bar", &snapshot);
+        let bar_space = Prefixed::new("bar", snapshot.as_ref());
         let list = bar_space.get_list::<_, u64>("test");
         assert_eq!(list.get(0), Some(1_u64));
 

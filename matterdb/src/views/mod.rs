@@ -130,25 +130,17 @@ pub trait RawAccessMut: RawAccess {}
 
 impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}
 
-macro_rules! impl_snapshot_access {
-    ($typ:ty) => {
-        impl RawAccess for $typ {
-            type Changes = ();
+impl RawAccess for &dyn Snapshot {
+    type Changes = ();
 
-            fn snapshot(&self) -> &dyn Snapshot {
-                self.as_ref()
-            }
+    fn snapshot(&self) -> &dyn Snapshot {
+        *self
+    }
 
-            fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
-        }
-    };
+    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {
+        // no changes
+    }
 }
-
-// FIXME: unnecessary?
-impl_snapshot_access!(&dyn Snapshot);
-impl_snapshot_access!(&Box<dyn Snapshot>);
-impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
-impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
 impl<T: RawAccess> ViewInner<T> {
     fn snapshot(&self) -> &dyn Snapshot {

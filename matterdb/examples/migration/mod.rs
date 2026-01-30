@@ -179,7 +179,7 @@ where
 
     // Check that DB contains old and new data.
     let snapshot = db.snapshot();
-    check_data_before_flush(&snapshot);
+    check_data_before_flush(snapshot.as_ref());
     // Finalize the migration by calling `flush_migration`.
     let mut fork = db.fork();
     flush_migration(&mut fork, "test");
@@ -194,10 +194,10 @@ where
     db.merge(patch).unwrap();
     // Check that data was updated after merge.
     let snapshot = db.snapshot();
-    check_data_after_flush(&snapshot);
+    check_data_after_flush(snapshot.as_ref());
 
     // Print DB state after migration is completed.
-    let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
+    let schema = v2::Schema::new(Prefixed::new("test", snapshot.as_ref()));
     println!("After migration:");
     schema.print_wallets();
 }

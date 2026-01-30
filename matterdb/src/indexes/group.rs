@@ -229,7 +229,7 @@ mod tests {
         prepare_key_iter(&&fork);
         test_key_iter(fork.readonly());
         let patch = fork.into_patch();
-        test_key_iter(&patch);
+        test_key_iter(patch.as_ref());
     }
 
     #[test]
@@ -239,9 +239,9 @@ mod tests {
         prepare_key_iter(&Prefixed::new("namespace", &fork));
         test_key_iter(Prefixed::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Prefixed::new("namespace", &patch));
+        test_key_iter(Prefixed::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Prefixed::new("namespace", &db.snapshot()));
+        test_key_iter(Prefixed::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -251,9 +251,9 @@ mod tests {
         prepare_key_iter(&Migration::new("namespace", &fork));
         test_key_iter(Migration::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Migration::new("namespace", &patch));
+        test_key_iter(Migration::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Migration::new("namespace", &db.snapshot()));
+        test_key_iter(Migration::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -263,8 +263,8 @@ mod tests {
         prepare_key_iter(&Scratchpad::new("namespace", &fork));
         test_key_iter(Scratchpad::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Scratchpad::new("namespace", &patch));
+        test_key_iter(Scratchpad::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Scratchpad::new("namespace", &db.snapshot()));
+        test_key_iter(Scratchpad::new("namespace", db.snapshot().as_ref()));
     }
 }

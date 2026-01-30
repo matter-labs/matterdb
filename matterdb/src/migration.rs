@@ -644,7 +644,7 @@ mod tests {
         // Merge the fork and run the checks again.
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        check_indexes(&snapshot);
+        check_indexes(snapshot.as_ref());
     }
 
     #[test]
@@ -720,7 +720,7 @@ mod tests {
         check_indexes(&fork);
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        check_indexes(&snapshot);
+        check_indexes(snapshot.as_ref());
     }
 
     fn test_migration_rollback(with_merge: bool) {
@@ -741,6 +741,7 @@ mod tests {
         fork.rollback_migration("test");
         assert_eq!(fork.get_entry::<_, u8>("test.foo").get(), Some(1));
         let patch = fork.into_patch();
+        let patch = patch.as_ref();
         assert_eq!(patch.get_entry::<_, u8>("test.foo").get(), Some(1));
         assert_eq!(
             patch
@@ -750,7 +751,7 @@ mod tests {
             vec![1_i32, 2, 3]
         );
 
-        let migration = Migration::new("test", &patch);
+        let migration = Migration::new("test", patch);
         assert!(!migration.get_entry::<_, u8>("foo").exists());
         // Since migrated indexes don't exist, it should be OK to assign new types to them.
         assert!(!migration.get_entry::<_, ()>(("list", &1)).exists());
@@ -799,13 +800,13 @@ mod tests {
 
         // Check that info persists to `Patch`es and `Snapshot`s.
         let patch = fork.into_patch();
-        let scratchpad = Scratchpad::new("test", &patch);
+        let scratchpad = Scratchpad::new("test", patch.as_ref());
         let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
         db.merge(patch).unwrap();
         let snapshot = db.snapshot();
-        let scratchpad = Scratchpad::new("test", &snapshot);
+        let scratchpad = Scratchpad::new("test", snapshot.as_ref());
         let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
@@ -968,7 +969,7 @@ mod tests {
         let res = rig.thread_handle.join().unwrap();
         assert_matches!(res.unwrap_err(), MigrationError::Aborted);
         let snapshot = db.snapshot();
-        let migration = Migration::new("test", &snapshot);
+        let migration = Migration::new("test", snapshot.as_ref());
         assert!(!migration.get_entry::<_, u32>("entry").exists());
     }
 
@@ -981,7 +982,7 @@ mod tests {
         let res = rig.thread_handle.join().unwrap();
         res.unwrap();
         let snapshot = db.snapshot();
-        let migration = Migration::new("test", &snapshot);
+        let migration = Migration::new("test", snapshot.as_ref());
         assert_eq!(migration.get_entry::<_, u32>("entry").get(), Some(1));
     }
 

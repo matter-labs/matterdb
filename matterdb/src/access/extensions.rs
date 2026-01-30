@@ -281,9 +281,12 @@ mod tests {
         assert_eq!(fork.index_type(("fam", &1_u8)), None);
 
         let patch = fork.into_patch();
-        assert_eq!(patch.index_type("list"), Some(IndexType::List));
-        assert_eq!(patch.index_type(("fam", &0_u8)), Some(IndexType::Map));
-        assert_eq!(patch.index_type(("fam", &1_u8)), None);
+        {
+            let patch = patch.as_ref();
+            assert_eq!(patch.index_type("list"), Some(IndexType::List));
+            assert_eq!(patch.index_type(("fam", &0_u8)), Some(IndexType::Map));
+            assert_eq!(patch.index_type(("fam", &1_u8)), None);
+        }
 
         db.merge(patch).unwrap();
         let snapshot = db.snapshot();
@@ -314,7 +317,7 @@ mod tests {
         fork.flush_migration("some");
 
         let patch = fork.into_patch();
-        let ns = Prefixed::new("some", &patch);
+        let ns = Prefixed::new("some", patch.as_ref());
         assert_eq!(ns.clone().index_type("list"), Some(IndexType::List));
         assert_eq!(ns.clone().index_type(("entry", &0_u8)), None);
         assert_eq!(

@@ -351,6 +351,12 @@ pub struct Patch {
     changes: HashMap<ResolvedAddress, ViewChanges>,
 }
 
+impl AsRef<dyn Snapshot> for Patch {
+    fn as_ref(&self) -> &dyn Snapshot {
+        self
+    }
+}
+
 pub(super) struct ForkIter<'a, T: StdIterator> {
     snapshot: Iter<'a>,
     changes: Option<Peekable<T>>,
@@ -670,16 +676,6 @@ impl Snapshot for Patch {
     }
 }
 
-impl RawAccess for &Patch {
-    type Changes = ();
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        *self as &dyn Snapshot
-    }
-
-    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
-}
-
 impl Fork {
     /// Finalizes all changes that were made after previous execution of the `flush` method.
     /// If no `flush` method had been called before, finalizes all changes that were
@@ -806,26 +802,6 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
             inner: self.0.working_patch.clone_view_changes(address),
             _lifetime: PhantomData,
         }
-    }
-}
-
-impl AsRef<dyn Snapshot> for dyn Snapshot {
-    fn as_ref(&self) -> &dyn Snapshot {
-        self
-    }
-}
-
-impl Snapshot for Box<dyn Snapshot> {
-    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        self.as_ref().get(name, key)
-    }
-
-    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
-        self.as_ref().contains(name, key)
-    }
-
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
-        self.as_ref().iter(name, from)
     }
 }
 
@@ -1176,6 +1152,7 @@ mod tests {
         let fork = db.fork();
         fork.get_entry(("foo", &1_u8)).set(2_u32);
         let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        let backup = backup.as_ref();
         assert!(backup.index_type(("foo", &1_u8)).is_none());
         assert!(backup.get_list::<_, u32>(("foo", &1_u8)).is_empty());
     }

@@ -854,9 +854,9 @@ mod prop_tests {
                 }
                 Action::MergeFork => {
                     let patch = fork.into_patch();
-                    check_groups(&patch, &groups, buffer_size)?;
+                    check_groups(patch.as_ref(), &groups, buffer_size)?;
                     db.merge(patch).unwrap();
-                    check_groups(&db.snapshot(), &groups, buffer_size)?;
+                    check_groups(db.snapshot().as_ref(), &groups, buffer_size)?;
                     fork = db.fork();
                 }
             }

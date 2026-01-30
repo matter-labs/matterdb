@@ -253,7 +253,7 @@ fn apply_actions(
     check_final_consistency(&patch, &new_indexes)?;
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
-    check_final_consistency(&snapshot, &new_indexes)?;
+    check_final_consistency(snapshot.as_ref(), &new_indexes)?;
 
     Ok(())
 }
