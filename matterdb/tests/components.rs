@@ -2,7 +2,7 @@
 
 use matterdb::{
     BinaryKey, Database, Entry, Group, Lazy, ListIndex, MapIndex, TemporaryDB,
-    access::{Access, CopyAccessExt, FromAccess, RawAccessMut},
+    access::{Access, AccessExt, FromAccess, RawAccessMut},
 };
 use matterdb_derive::FromAccess;
 

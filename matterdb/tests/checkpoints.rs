@@ -1,4 +1,4 @@
-use matterdb::{DBOptions, Database, RocksDB, access::CopyAccessExt};
+use matterdb::{DBOptions, Database, RocksDB, access::AccessExt};
 use tempfile::TempDir;
 
 #[test]

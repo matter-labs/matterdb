@@ -45,7 +45,7 @@ use std::fmt;
 
 use thiserror::Error;
 
-pub use self::extensions::{AccessExt, CopyAccessExt};
+pub use self::extensions::AccessExt;
 pub use crate::views::{RawAccess, RawAccessMut};
 use crate::{
     BinaryKey,
@@ -362,7 +362,7 @@ pub trait FromAccess<T: Access>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use super::{Access, AccessExt, CopyAccessExt, FromAccess, IndexType, Prefixed};
+    use super::{Access, AccessExt, FromAccess, IndexType, Prefixed};
     use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]

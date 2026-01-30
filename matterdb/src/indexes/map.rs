@@ -315,7 +315,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const IDX_NAME: &str = "idx_name";
 

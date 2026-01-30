@@ -11,7 +11,7 @@ use anyhow::{bail, ensure};
 
 use crate::{
     BinaryKey, BinaryValue, Entry,
-    access::{Access, AccessExt, RawAccess, RawAccessMut},
+    access::{Access, FromAccess, RawAccess, RawAccessMut},
     indexes::{Entries, IndexIterator},
 };
 
@@ -173,11 +173,17 @@ where
     I: IndexIterator,
 {
     /// Creates a new persistent iterator.
+    ///
+    /// # Panics
+    ///
+    /// Panics on database errors.
     pub fn new<A>(access: &A, name: &str, index: &'a I) -> Self
     where
         A: Access<Base = T>,
     {
-        let position_entry: Entry<_, IteratorPosition<I::Key>> = access.get_entry(name);
+        let position_entry: Entry<_, IteratorPosition<I::Key>> =
+            Entry::from_access(access.clone(), name.into())
+                .unwrap_or_else(|e| panic!("MerkleDB error: {e}"));
         let position = position_entry.get();
 
         let start_key = match position {
@@ -324,11 +330,12 @@ where
     /// when this is a priori not the case.
     pub(super) fn all_ended(&self) -> bool {
         for name in &self.names {
-            let pos = self
-                .access
-                .clone()
-                .get_entry::<_, IteratorPosition<()>>(name.as_str())
-                .get();
+            let pos = Entry::<_, IteratorPosition<()>>::from_access(
+                self.access.clone(),
+                name.clone().into(),
+            )
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
+            .get();
             if pos != Some(IteratorPosition::Ended) {
                 return false;
             }
@@ -339,8 +346,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessExt, IteratorPosition, PersistentIter, PersistentKeys};
-    use crate::{Database, MapIndex, TemporaryDB, access::CopyAccessExt, migration::Scratchpad};
+    use super::{IteratorPosition, PersistentIter, PersistentKeys};
+    use crate::{Database, MapIndex, TemporaryDB, access::AccessExt, migration::Scratchpad};
 
     #[test]
     fn persistent_iter_for_map() {

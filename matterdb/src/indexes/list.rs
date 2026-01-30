@@ -378,10 +378,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{ListIndex, RawAccessMut};
-    use crate::{
-        Database, Fork, TemporaryDB,
-        access::{AccessExt, CopyAccessExt},
-    };
+    use crate::{Database, Fork, TemporaryDB, access::AccessExt};
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());
@@ -436,11 +433,9 @@ mod tests {
     }
 
     fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {
-        #[allow(clippy::needless_pass_by_value)]
-        // ^-- better for type inference: we want `T == &Fork`, not `T == Fork`.
-        fn list<T>(index: u32, view: T) -> ListIndex<T, String>
+        fn list<T: 'static>(index: u32, view: &T) -> ListIndex<&T, String>
         where
-            T: RawAccessMut,
+            for<'a> &'a T: RawAccessMut,
         {
             view.get_list(("family", &index))
         }

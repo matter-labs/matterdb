@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use crate::{
         Database, ListIndex, TemporaryDB,
-        access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
+        access::{AccessExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},
     };
 
@@ -177,10 +177,10 @@ mod tests {
         // group.get(&3).push("quux".to_owned());
     }
 
-    fn prepare_key_iter<A>(fork: &A)
+    fn prepare_key_iter<'a, A>(fork: &'a A)
     where
-        A: Access,
-        A::Base: RawAccessMut,
+        A: AccessExt + ?Sized,
+        <A::Ref<'a> as Access>::Base: RawAccessMut,
     {
         let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
         group.get("foo").push("foo".to_owned());
@@ -188,7 +188,7 @@ mod tests {
         group.get("baz").push("baz".to_owned());
 
         let group: Group<_, u32, ListIndex<_, String>> =
-            Group::from_access(fork.clone(), ("prefixed", &0_u8).into()).unwrap();
+            Group::from_access(fork.get_ref(), ("prefixed", &0_u8).into()).unwrap();
         group.get(&1).push("foo".to_owned());
         group.get(&2).push("bar".to_owned());
         group.get(&5).push("baz".to_owned());
@@ -207,9 +207,9 @@ mod tests {
         fork.get_entry("unrelated").set(23);
     }
 
-    fn test_key_iter<A>(snapshot: A)
+    fn test_key_iter<A>(snapshot: &A)
     where
-        A: Access,
+        A: AccessExt + ?Sized,
     {
         let group: Group<_, str, ListIndex<_, String>> = snapshot.get_group("group");
         assert_eq!(
@@ -218,7 +218,7 @@ mod tests {
         );
 
         let group: Group<_, u32, ListIndex<_, String>> =
-            Group::from_access(snapshot, ("prefixed", &0_u8).into()).unwrap();
+            Group::from_access(snapshot.get_ref(), ("prefixed", &0_u8).into()).unwrap();
         assert_eq!(group.keys().collect::<Vec<_>>(), vec![1, 2, 5, 100_000]);
     }
 
@@ -226,8 +226,8 @@ mod tests {
     fn iterating_over_keys() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(&&fork);
-        test_key_iter(fork.readonly());
+        prepare_key_iter(&fork);
+        test_key_iter(&fork.readonly());
         let patch = fork.into_patch();
         test_key_iter(patch.as_ref());
     }
@@ -237,11 +237,11 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Prefixed::new("namespace", &fork));
-        test_key_iter(Prefixed::new("namespace", fork.readonly()));
+        test_key_iter(&Prefixed::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Prefixed::new("namespace", patch.as_ref()));
+        test_key_iter(&Prefixed::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Prefixed::new("namespace", db.snapshot().as_ref()));
+        test_key_iter(&Prefixed::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -249,11 +249,11 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Migration::new("namespace", &fork));
-        test_key_iter(Migration::new("namespace", fork.readonly()));
+        test_key_iter(&Migration::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Migration::new("namespace", patch.as_ref()));
+        test_key_iter(&Migration::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Migration::new("namespace", db.snapshot().as_ref()));
+        test_key_iter(&Migration::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -261,10 +261,10 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Scratchpad::new("namespace", &fork));
-        test_key_iter(Scratchpad::new("namespace", fork.readonly()));
+        test_key_iter(&Scratchpad::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Scratchpad::new("namespace", patch.as_ref()));
+        test_key_iter(&Scratchpad::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Scratchpad::new("namespace", db.snapshot().as_ref()));
+        test_key_iter(&Scratchpad::new("namespace", db.snapshot().as_ref()));
     }
 }

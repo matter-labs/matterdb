@@ -209,7 +209,7 @@ impl From<TemporaryDB> for Arc<dyn Database> {
 
 #[test]
 fn clearing_database() {
-    use crate::access::CopyAccessExt;
+    use crate::access::AccessExt;
 
     let db = TemporaryDB::new();
     let fork = db.fork();

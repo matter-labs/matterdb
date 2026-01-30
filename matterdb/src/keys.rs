@@ -306,7 +306,7 @@ mod tests {
     use chrono::{Duration, TimeZone};
 
     use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
-    use crate::access::CopyAccessExt;
+    use crate::access::AccessExt;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;

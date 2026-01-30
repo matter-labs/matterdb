@@ -207,7 +207,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::KeySetIndex;
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const INDEX_NAME: &str = "test_index_name";
 

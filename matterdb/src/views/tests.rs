@@ -5,7 +5,7 @@ use url::form_urlencoded::byte_serialize;
 
 use crate::{
     DBOptions, Database, Fork, ListIndex, MapIndex, ResolvedAddress, RocksDB, TemporaryDB,
-    access::CopyAccessExt,
+    access::AccessExt,
     db,
     validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},

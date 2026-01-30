@@ -3,7 +3,7 @@ use std::hint::black_box;
 use criterion::{
     AxisScale, BatchSize, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
-use matterdb::{Fork, ListIndex, MapIndex, access::CopyAccessExt};
+use matterdb::{Fork, ListIndex, MapIndex, access::AccessExt};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::BenchDB;

@@ -975,7 +975,7 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::{TemporaryDB, access::CopyAccessExt};
+    use crate::{TemporaryDB, access::AccessExt};
 
     #[test]
     fn readonly_indexes_are_timely_dropped() {

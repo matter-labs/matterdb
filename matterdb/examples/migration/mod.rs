@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use matterdb::{
     Database, Entry, Group, ListIndex, MapIndex, Snapshot, TemporaryDB,
-    access::{Access, CopyAccessExt, FromAccess, Prefixed},
+    access::{Access, AccessExt, FromAccess, Prefixed},
     migration::{Migration, flush_migration},
 };
 use matterdb_derive::{BinaryValue, FromAccess};

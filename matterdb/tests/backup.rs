@@ -2,10 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use matterdb::{
-    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
-    access::{Access, AccessExt},
-};
+use matterdb::{Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB, access::AccessExt};
 use proptest::{
     collection::vec,
     prop_assert, prop_oneof, proptest, strategy,
@@ -42,7 +39,10 @@ fn generate_action() -> impl Strategy<Value = Action> + Clone {
     ]
 }
 
-fn check_index_does_not_exist<S: Access + Copy>(snapshot: S, addr: IndexAddress) -> TestCaseResult {
+fn check_index_does_not_exist<S: AccessExt + ?Sized>(
+    snapshot: &S,
+    addr: IndexAddress,
+) -> TestCaseResult {
     if let Some(index_type) = snapshot.index_type(addr) {
         prop_assert!(false, "{:?}", index_type);
     }

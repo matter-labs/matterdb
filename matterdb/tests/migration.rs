@@ -134,7 +134,7 @@ fn check_intermediate_consistency(
 ) -> TestCaseResult {
     for ((ns, addr), data) in new_indexes {
         let migration = Migration::new(*ns, snapshot);
-        data.check(migration, addr.to_owned())?;
+        data.check(&migration, addr.to_owned())?;
     }
     Ok(())
 }
@@ -174,7 +174,7 @@ fn apply_actions(
                     work_on_index(&fork, addr.clone(), index_type, value.clone())
                 } else {
                     let migration = Migration::new(namespace, &fork);
-                    work_on_index(migration.clone(), addr.clone(), index_type, value.clone())
+                    work_on_index(&migration, addr.clone(), index_type, value.clone())
                 };
 
                 if !namespace.is_empty() {

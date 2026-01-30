@@ -584,14 +584,11 @@ mod tests {
         MigrationHelper, SCRATCHPAD_NAME, Scratchpad, ViewWithMetadata, flush_migration,
         rollback_migration,
     };
-    use crate::{
-        TemporaryDB,
-        access::{AccessExt, CopyAccessExt, RawAccess},
-    };
+    use crate::{TemporaryDB, access::AccessExt};
 
     #[test]
     fn in_memory_migration() {
-        fn check_indexes<T: RawAccess + Copy>(view: T) {
+        fn check_indexes<T: AccessExt + ?Sized>(view: &T) {
             let list = view.get_list::<_, u64>("name.list");
             assert_eq!(list.len(), 2);
             assert_eq!(list.get(0), Some(4));
@@ -649,7 +646,7 @@ mod tests {
 
     #[test]
     fn migration_with_merges() {
-        fn check_indexes<T: RawAccess + Copy>(view: T) {
+        fn check_indexes<T: AccessExt + ?Sized>(view: &T) {
             let list = view.get_list::<_, u64>("name.list");
             assert_eq!(list.len(), 4);
             assert_eq!(list.get(2), Some(6));

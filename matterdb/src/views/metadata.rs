@@ -619,7 +619,7 @@ mod tests {
         BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool,
         NonZeroU64, vec,
     };
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -775,7 +775,7 @@ mod prop_tests {
     };
 
     use super::{GroupKeys, IndexAddress, RawAccess};
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const ACTIONS_MAX_LEN: usize = 30;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;
