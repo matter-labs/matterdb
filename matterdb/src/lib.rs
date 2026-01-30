@@ -104,7 +104,6 @@ pub use self::{
     db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     keys::BinaryKey,
-    lazy::Lazy,
     options::DBOptions,
     values::BinaryValue,
     views::{IndexAddress, IndexType, ResolvedAddress},
@@ -118,7 +117,6 @@ mod db;
 mod error;
 pub mod indexes;
 mod keys;
-mod lazy;
 pub mod migration;
 mod options;
 pub mod validation;

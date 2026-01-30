@@ -1,7 +1,7 @@
 //! Tests related to components and `FromAccess` derivation.
 
 use matterdb::{
-    BinaryKey, Database, Entry, Group, Lazy, ListIndex, MapIndex, TemporaryDB,
+    BinaryKey, Database, Entry, Group, ListIndex, MapIndex, TemporaryDB,
     access::{Access, AccessExt, FromAccess, RawAccessMut},
 };
 use matterdb_derive::FromAccess;
@@ -34,7 +34,6 @@ where
 struct ComplexSchema<T: Access> {
     count: Entry<T::Base, u64>,
     generic: Generic<T, String>,
-    lazy: Lazy<T, Simple<T>>,
     group: Group<T, str, Simple<T>>,
 }
 
@@ -45,7 +44,6 @@ where
     fn modify(&mut self, key: u64, value: String) {
         self.generic.inner.put(&value, key);
         self.count.set(self.count.get().unwrap_or_default() + 1);
-        self.lazy.get().modify(key, value.clone());
         self.group.get(&value).modify(key, value);
     }
 }
@@ -65,17 +63,6 @@ fn embedded_components() {
         assert_eq!(complex.count.get(), Some(4));
         assert_eq!(complex.generic.inner.get(&"!".to_owned()), Some(42));
 
-        let lazy = complex.lazy.get();
-        assert_eq!(lazy.map.keys().collect::<Vec<_>>(), vec![1, 2, 42]);
-        assert_eq!(
-            lazy.list.iter().collect::<Vec<_>>(),
-            vec![
-                "!".to_owned(),
-                "!!".to_owned(),
-                "?".to_owned(),
-                "!".to_owned()
-            ]
-        );
         let grouped = complex.group.get("!");
         assert_eq!(
             grouped.map.iter().collect::<Vec<_>>(),

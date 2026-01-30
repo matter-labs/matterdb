@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use matterdb::{Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB, access::AccessExt};
+use matterdb::{Database, IndexAddress, IndexType, TemporaryDB, access::AccessExt};
 use proptest::{
     collection::vec,
     prop_assert, prop_oneof, proptest, strategy,

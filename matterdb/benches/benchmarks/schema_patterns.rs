@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use criterion::{Bencher, Criterion, Throughput};
 use matterdb::{
-    Group, KeySetIndex, Lazy, ListIndex, MapIndex,
+    Group, KeySetIndex, ListIndex, MapIndex,
     access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
 };
 use matterdb_derive::{BinaryValue, FromAccess};
@@ -102,10 +102,10 @@ struct LazySchema<T: Access> {
     transactions: MapIndex<T::Base, u32, Transaction>,
     hot_index: MapIndex<T::Base, u64, u32>,
     hot_group: Group<T, u64, ListIndex<T::Base, u64>>,
-    cold_index: Lazy<T, MapIndex<T::Base, u64, u32>>,
+    cold_index: MapIndex<T::Base, u64, u32>,
     // groups are already lazy
     cold_group: Group<T, u64, ListIndex<T::Base, u64>>,
-    other_cold_index: Lazy<T, KeySetIndex<T::Base, u64>>,
+    other_cold_index: KeySetIndex<T::Base, u64>,
 }
 
 impl<T: Access> LazySchema<T> {
@@ -134,12 +134,12 @@ where
                 let cold_group_id = transaction.value % COLD_DIVISOR;
                 let mut list_in_group = self.cold_group.get(&cold_group_id);
                 list_in_group.push(transaction.value);
-                self.cold_index.get().put(&cold_group_id, divisor);
+                self.cold_index.put(&cold_group_id, divisor);
             }
         }
 
         if transaction.value % COLD_CHANCE == 0 {
-            self.other_cold_index.get().insert(&transaction.value);
+            self.other_cold_index.insert(&transaction.value);
         }
     }
 }
