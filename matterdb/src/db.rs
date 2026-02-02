@@ -191,7 +191,7 @@ impl WorkingPatch {
             .clone()
     }
 
-    // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
+    // TODO: verify that this method updates `Change`s already in the `Patch`
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
             // Check that changes are not borrowed mutably (in this case, the corresponding
@@ -225,7 +225,7 @@ impl WorkingPatch {
 }
 
 /// A generalized iterator over the storage views.
-pub type Iter<'a> = Box<dyn Iterator + 'a>;
+pub type BoxedIterator<'a> = Box<dyn Iterator + 'a>;
 
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
@@ -358,7 +358,7 @@ impl AsRef<dyn Snapshot> for Patch {
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
-    snapshot: Iter<'a>,
+    snapshot: BoxedIterator<'a>,
     changes: Option<Peekable<T>>,
 }
 
@@ -509,10 +509,7 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
-}
 
-/// Extension trait for `Database`.
-pub trait DatabaseExt: Database {
     /// Merges a patch into the database and creates a backup patch that reverses all the merged
     /// changes.
     ///
@@ -598,8 +595,6 @@ pub trait DatabaseExt: Database {
     }
 }
 
-impl<T: Database> DatabaseExt for T {}
-
 /// A read-only snapshot of a storage backend.
 ///
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
@@ -620,7 +615,7 @@ pub trait Snapshot: Send + Sync + 'static {
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
     #[allow(clippy::iter_not_returning_iterator)]
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> BoxedIterator<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -658,7 +653,7 @@ impl Snapshot for Patch {
             .unwrap_or_else(|()| self.snapshot.contains(name, key))
     }
 
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> BoxedIterator<'_> {
         let maybe_changes = self.changes.get(name);
         let changes_iter = maybe_changes.map(|changes| {
             changes
@@ -809,7 +804,7 @@ impl<'a, T> ForkIter<'a, T>
 where
     T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
-    pub(crate) fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
+    pub(crate) fn new(snapshot: BoxedIterator<'a>, changes: Option<T>) -> Self {
         ForkIter {
             snapshot,
             changes: changes.map(StdIterator::peekable),

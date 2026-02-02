@@ -8,7 +8,7 @@ pub use self::{
     metadata::IndexType,
 };
 use crate::{
-    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
+    BinaryKey, BinaryValue, BoxedIterator as BytesIter, Iterator as BytesIterator, Snapshot,
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     views::address::key_bytes,
 };

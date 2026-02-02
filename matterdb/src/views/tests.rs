@@ -364,7 +364,7 @@ fn test_database_check_incorrect_version() {
     let opts = DBOptions::default();
     // Writes different version to metadata.
     {
-        let db = RocksDB::open(&dir, &opts).unwrap();
+        let db = RocksDB::open(dir.path(), &opts).unwrap();
         let fork = db.fork();
         {
             let mut view = View::new(&fork, ResolvedAddress::system(db::DB_METADATA));
@@ -373,7 +373,7 @@ fn test_database_check_incorrect_version() {
         db.merge(fork.into_patch()).unwrap();
     }
     // Tries to open modified database.
-    RocksDB::open(&dir, &opts).unwrap();
+    RocksDB::open(dir.path(), &opts).unwrap();
 }
 
 #[test]

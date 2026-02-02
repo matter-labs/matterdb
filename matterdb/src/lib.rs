@@ -101,7 +101,7 @@ pub use self::{
         rocksdb::{self, RocksDB},
         temporarydb::TemporaryDB,
     },
-    db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
+    db::{BoxedIterator, Database, Fork, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     keys::BinaryKey,
     options::DBOptions,

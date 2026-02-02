@@ -10,7 +10,7 @@ use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 
 use crate::{
-    Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
+    BoxedIterator, Database, Patch, ResolvedAddress, Result, Snapshot,
     backends::rocksdb::{ID_SIZE, next_id_bytes},
     db::{Change, Iterator as DBIterator, check_database},
 };
@@ -177,7 +177,7 @@ impl Snapshot for TemporarySnapshot {
         collection.get(name.keyed(key).as_ref()).cloned()
     }
 
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> BoxedIterator<'_> {
         let collection = self
             .snapshot
             .get(name)
