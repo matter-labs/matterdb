@@ -16,7 +16,6 @@ anyhow.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
 rocksdb.workspace = true
-rust_decimal.workspace = true
 serde = { workspace = true, features = ["derive"] }
 smallvec.workspace = true
 thiserror.workspace = true

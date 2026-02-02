@@ -1,11 +1,10 @@
 //! A definition of `BinaryValue` trait and implementations for common types.
 
-use std::{borrow::Cow, io::Read};
+use std::borrow::Cow;
 
 use anyhow::{self, Context, format_err};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, TimeZone, Utc};
-use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -189,28 +188,15 @@ impl BinaryValue for Uuid {
     }
 }
 
-impl BinaryValue for Decimal {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.serialize().to_vec()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        let mut value = bytes.as_ref();
-        let mut buf: [u8; 16] = [0; 16];
-        value.read_exact(&mut buf)?;
-        Ok(Self::deserialize(buf))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, str::FromStr};
+    use std::fmt;
 
     use chrono::Duration;
 
-    use super::{BinaryValue, Decimal, Utc, Uuid};
+    use super::*;
 
-    fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
+    fn assert_round_trip_eq<T: BinaryValue + PartialEq + fmt::Debug>(values: &[T]) {
         for value in values {
             let bytes = value.to_bytes();
             assert_eq!(
@@ -304,18 +290,6 @@ mod tests {
             Uuid::nil(),
             Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
             Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-        ];
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn test_binary_form_decimal() {
-        let values = [
-            Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
-            Decimal::new(9_497_628_354_687_268, 12),
-            Decimal::from_str("0").unwrap(),
-            Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
         assert_round_trip_eq(&values);
     }

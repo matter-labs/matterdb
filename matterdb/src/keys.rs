@@ -2,7 +2,6 @@
 
 use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, TimeZone, Utc};
-use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
@@ -282,30 +281,13 @@ impl BinaryKey for Uuid {
     }
 }
 
-impl BinaryKey for Decimal {
-    fn size(&self) -> usize {
-        16
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(&self.serialize());
-        self.size()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let mut bytes = [0_u8; 16];
-        bytes.copy_from_slice(buffer);
-        Self::deserialize(bytes)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, str::FromStr};
+    use std::fmt;
 
-    use chrono::{Duration, TimeZone};
+    use chrono::Duration;
 
-    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
+    use super::*;
     use crate::access::AccessExt;
 
     // Number of samples for fuzz testing
@@ -546,23 +528,10 @@ mod tests {
         assert_round_trip_eq(&uuids);
     }
 
-    #[test]
-    fn test_decimal_round_trip() {
-        let decimals = [
-            Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
-            Decimal::new(9_497_628_354_687_268, 12),
-            Decimal::from_str("0").unwrap(),
-            Decimal::from_str("-0.000000000000000000019").unwrap(),
-        ];
-
-        assert_round_trip_eq(&decimals);
-    }
-
     fn assert_round_trip_eq<T>(values: &[T])
     where
-        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + Debug,
-        <T as ToOwned>::Owned: Debug,
+        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + fmt::Debug,
+        <T as ToOwned>::Owned: fmt::Debug,
     {
         for original_value in values {
             let mut buffer = get_buffer(original_value);
