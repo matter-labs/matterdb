@@ -276,7 +276,7 @@ fn single_migration() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(SINGLE_NAMESPACE), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -287,7 +287,7 @@ fn single_migration_with_rollbacks() {
     let action = generate_action_with_rollbacks(SINGLE_NAMESPACE);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -296,7 +296,7 @@ fn multiple_migrations_with_synced_end() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(NAMESPACES), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -306,6 +306,6 @@ fn multiple_migrations_with_synced_end_and_rollbacks() {
     let action = generate_action_with_rollbacks(NAMESPACES);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }

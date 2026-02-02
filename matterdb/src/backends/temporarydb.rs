@@ -3,10 +3,9 @@
 use std::{
     collections::{BTreeMap, HashMap, btree_map::Range},
     iter::{Iterator, Peekable},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
-use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 
 use crate::{
@@ -21,7 +20,7 @@ type MemoryDB = HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
 /// operate under load in production.
 #[derive(Debug)]
 pub struct TemporaryDB {
-    inner: Arc<ShardedLock<MemoryDB>>,
+    inner: Arc<RwLock<MemoryDB>>,
 }
 
 struct TemporarySnapshot {
@@ -41,22 +40,20 @@ impl TemporaryDB {
         let mut db = HashMap::new();
 
         db.insert(ResolvedAddress::system("default"), BTreeMap::new());
-        let inner = Arc::new(ShardedLock::new(db));
+        let inner = Arc::new(RwLock::new(db));
         let mut db = Self { inner };
         check_database(&mut db).unwrap();
         db
     }
 
     /// Clears the contents of the database.
-    #[allow(clippy::missing_panics_doc, clippy::missing_errors_doc)] // FIXME: always returns Ok(())
-    pub fn clear(&self) -> crate::Result<()> {
-        let mut rw_lock = self.inner.write().expect("Couldn't get read-write lock");
+    #[allow(clippy::missing_panics_doc)] // implementation detail
+    pub fn clear(&self) {
+        let mut rw_lock = self.inner.write().expect("Database lock is poisoned");
 
         for collection in rw_lock.values_mut() {
             collection.clear();
         }
-
-        Ok(())
     }
 
     fn temporary_snapshot(&self) -> TemporarySnapshot {
@@ -78,7 +75,7 @@ impl Database for TemporaryDB {
                 inner.insert(resolved.clone(), BTreeMap::new());
             }
 
-            let collection: &mut BTreeMap<Vec<u8>, Vec<u8>> = inner.get_mut(&resolved).unwrap();
+            let collection = inner.get_mut(&resolved).unwrap();
 
             if changes.is_cleared() {
                 if let Some(id_bytes) = resolved.id_to_bytes() {
@@ -218,7 +215,7 @@ fn clearing_database() {
     fork.get_entry(("bar", &0_u8)).set("!".to_owned());
     fork.get_entry(("bar", &1_u8)).set("?".to_owned());
     db.merge(fork.into_patch()).unwrap();
-    db.clear().unwrap();
+    db.clear();
 
     let fork = db.fork();
 

@@ -159,6 +159,6 @@ fn backup_with_db_clearing() {
     let actions = vec(generate_action(), 1..ACTIONS_MAX_LEN);
     proptest!(|(init_actions in actions.clone(), main_actions in actions)| {
         apply_actions(&db, init_actions, main_actions)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }

@@ -871,7 +871,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, DEFAULT_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 
@@ -881,7 +881,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 
@@ -891,7 +891,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 }
