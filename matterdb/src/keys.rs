@@ -2,13 +2,12 @@
 
 use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, TimeZone, Utc};
-use uuid::Uuid;
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in the serialized form, the big-endian encoding should be used
 /// with unsigned integer types. Note, however, that the big-endian encoding
-/// will not sort signed integer types in the natural order; therefore, they are
+/// will not sort *signed* integer types in the natural order; therefore, they are
 /// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///
 /// # Examples
@@ -59,11 +58,9 @@ pub trait BinaryKey: ToOwned {
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key returned via `size()`. Returns number of written bytes.
     /// The provided buffer may be uninitialized; an implementor must not read from it.
-    // TODO: Should be unsafe? (ECR-174)
     fn write(&self, buffer: &mut [u8]) -> usize;
 
     /// Deserializes the key from the specified buffer of bytes.
-    // TODO: Should be unsafe? (ECR-174)
     fn read(buffer: &[u8]) -> Self::Owned;
 }
 
@@ -263,21 +260,6 @@ impl BinaryKey for DateTime<Utc> {
         Utc.timestamp_opt(secs, nanos)
             .single()
             .unwrap_or_else(|| panic!("stored timestamp out of range: {secs}, {nanos}"))
-    }
-}
-
-impl BinaryKey for Uuid {
-    fn size(&self) -> usize {
-        16
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(self.as_bytes());
-        self.size()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        Self::from_slice(buffer).unwrap()
     }
 }
 
@@ -515,17 +497,6 @@ mod tests {
             let new_val = <[u8] as BinaryKey>::read(&buffer);
             assert_eq!(new_val, *val);
         }
-    }
-
-    #[test]
-    fn test_uuid_round_trip() {
-        let uuids = [
-            Uuid::nil(),
-            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-        ];
-
-        assert_round_trip_eq(&uuids);
     }
 
     fn assert_round_trip_eq<T>(values: &[T])

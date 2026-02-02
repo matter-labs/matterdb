@@ -19,7 +19,6 @@ rocksdb.workspace = true
 serde = { workspace = true, features = ["derive"] }
 smallvec.workspace = true
 thiserror.workspace = true
-uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 matterdb-derive.workspace = true

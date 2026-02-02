@@ -5,7 +5,6 @@ use std::borrow::Cow;
 use anyhow::{self, Context, format_err};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, TimeZone, Utc};
-use uuid::Uuid;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -155,8 +154,6 @@ impl BinaryValue for String {
     }
 }
 
-// FIXME Maybe we should remove this implementations. [ECR-2775]
-
 impl BinaryValue for DateTime<Utc> {
     fn to_bytes(&self) -> Vec<u8> {
         let secs = self.timestamp();
@@ -175,16 +172,6 @@ impl BinaryValue for DateTime<Utc> {
         Utc.timestamp_opt(secs, nanos)
             .single()
             .with_context(|| format!("stored timestamp out of range: {secs}, {nanos}"))
-    }
-}
-
-impl BinaryValue for Uuid {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        Self::from_slice(bytes.as_ref()).map_err(From::from)
     }
 }
 
@@ -282,15 +269,5 @@ mod tests {
             Utc.timestamp_opt(0, 999_999_999).unwrap(),
         ];
         assert_round_trip_eq(&times);
-    }
-
-    #[test]
-    fn test_binary_form_uuid() {
-        let values = [
-            Uuid::nil(),
-            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-        ];
-        assert_round_trip_eq(&values);
     }
 }
