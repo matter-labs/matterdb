@@ -13,16 +13,13 @@ const MIGRATION_CHAR: u8 = b'^';
 ///
 /// An address has a string *name* and an optional byte *key*. An index is uniquely identified
 /// by its address. Different addresses correspond to different indexes. Addresses with the same
-/// name and differing keys are said to belong to the same *group* (see also [`Group`]). Groups
+/// name and differing keys are said to belong to the same *group* (see also [`Group`](crate::Group)). Groups
 /// can be used for a potentially unbounded group of indexes that can be identified by a certain
 /// key (for example, `ListIndex` with the transaction history of a wallet keyed by the
 /// `PublicKey` of the wallet).
 ///
 /// In contrast with [`ResolvedAddress`], `IndexAddress` is a high-level logical construct;
 /// it does not directly map to key-value storage abstractions (column families and their keys).
-///
-/// [`Group`]: indexes/group/struct.Group.html
-/// [`ResolvedAddress`]: struct.ResolvedAddress.html
 ///
 /// # Examples
 ///
@@ -249,8 +246,6 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
 /// While an [`IndexAddress`] is a logical location of a view, a `ResolvedAddress`
 /// represents its location in the key-value storage. The mapping between `IndexAddress`es
 /// and `ResolvedAddress`es is internal to the database logic.
-///
-/// [`IndexAddress`]: struct.IndexAddress.html
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ResolvedAddress {
     /// Name of the column family where the view is stored.

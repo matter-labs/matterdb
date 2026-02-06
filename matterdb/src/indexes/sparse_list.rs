@@ -64,8 +64,6 @@ impl BinaryAttribute for SparseListSize {
 /// `SparseListIndex` implements an array list, storing an element as a value and using `u64`
 /// as an index.
 /// `SparseListIndex` requires that elements should implement the [`BinaryValue`] trait.
-///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,

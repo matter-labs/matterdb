@@ -24,43 +24,27 @@
 //! when the migration is finalized.
 //!
 //! Retaining an index in the migration is a no op. *Removing* an index is explicit; it needs
-//! to be performed via [`create_tombstone`] method. Although tombstones do not contain data,
+//! to be performed via [`create_tombstone`](Migration::create_tombstone()) method.
+//! Although tombstones do not contain data,
 //! they behave like indexes in other regards. For example, it is impossible to create a tombstone
 //! and then create an ordinary index at the same address, or vice versa.
 //!
 //! A migration can also store temporary data in a [`Scratchpad`]. This data will be removed
 //! when the migration is finalized.
 //!
-//! Indexes created within a migration are not [aggregated] in the default state hash. Instead,
-//! they are placed in a separate namespace, the aggregator and state hash for which can be
-//! obtained via respective [`Migration`] methods.
-//!
 //! It is possible to periodically persist migrated data to the database
 //! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
 //! to restart the process handling the migration, provided it can recover from such a restart
-//! on the application level. To assist with fault tolerance, use [persistent iterators].
+//! on the application level. To assist with fault tolerance, use [persistent iterators](PersistentIter).
 //!
 //! # Finalizing Migration
 //!
-//! To finalize a migration, one needs to call [`flush_migration`]. This will replace
+//! To finalize a migration, one needs to call [`flush_migration()`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
 //! to the default state aggregator. To roll back a migration,
-//! use [`rollback_migration`]. This will remove the new index data and corresponding metadata.
+//! use [`rollback_migration()`]. This will remove the new index data and corresponding metadata.
 //! Both `flush_migration` and `rollback_migration` will remove the `Scratchpad` associated
 //! with the migration.
-//!
-//! [`Migration`]: struct.Migration.html
-//! [`Prefixed`]: ../access/struct.Prefixed.html
-//! [`create_tombstone`]: struct.Migration.html#method.create_tombstone
-//! [`Scratchpad`]: struct.Scratchpad.html
-//! [aggregated]: ../index.html#state-aggregation
-//! [persistent iterators]: struct.PersistentIter.html
-//! [`flush_migration`]: fn.flush_migration.html
-//! [`rollback_migration`]: fn.rollback_migration.html
-//!
-//! # Examples
-//!
-//! None yet.
 
 use std::{
     fmt,
@@ -95,8 +79,6 @@ const SCRATCHPAD_NAME: &str = "__scratchpad__";
 /// after the migration is flushed. The major difference with `Prefixed` is that the indexes
 /// in a migration cannot be accessed in any other way. That is, it is impossible to access
 /// an index in a migration without constructing a `Migration` object first.
-///
-/// [`Prefixed`]: ../access/struct.Prefixed.html
 #[derive(Debug, Clone)]
 pub struct Migration<T> {
     access: T,
@@ -241,7 +223,7 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 ///
 /// # Examples
 ///
-/// See the [module docs](index.html) for a basic example of usage.
+/// See the [module docs](crate::migration) for a basic example of usage.
 ///
 /// ## Aborting migration
 ///
@@ -249,9 +231,6 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 /// does not allow to merge changes to the database; the relevant methods will return
 /// [`MigrationError::Aborted`]. This is important, e.g., to prevent unnecessary writes
 /// to the database.
-///
-/// [`AbortHandle`]: struct.AbortHandle.html
-/// [`MigrationError::Aborted`]: enum.MigrationError.html#variant.Aborted
 ///
 /// ```
 /// # use assert_matches::assert_matches;
@@ -278,46 +257,41 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 /// assert_matches!(res, Err(MigrationError::Aborted));
 /// ```
 ///
-// TODO: The following section was left because I'm not sure what to do with it right now.
-// ## Using persistent iterators
-//
-// `MigrationHelper` offers the [`iter_loop`](#method.iter_loop) method, which allows to further
-// simplify working with [persistent iterators].
-//
-// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
-// from time to time. To do this, we use the following script:
-//
-// ```
-// # use matterdb::{access::AccessExt, TemporaryDB};
-// # use matterdb::migration::{MigrationHelper, MigrationError};
-// # fn main() -> Result<(), MigrationError> {
-// /// Number of accounts processed per DB merge.
-// const CHUNK_SIZE: usize = 100;
-//
-// let db = TemporaryDB::new();
-// let mut helper = MigrationHelper::new(db, "test");
-// helper.iter_loop(|helper, iters| {
-//     // The data before migration is stored in this map
-//     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
-//     // ...and the new data is in this merkelized map.
-//     let mut new_map = helper.new_data().get_map::<_, str, u64>("wallets");
-//
-//     // Create an iterator over the old data.
-//     let iter = iters.create("wallets", &old_map);
-//     // Take a fixed amount of records from the iterator and migrate them.
-//     // Since `iter` is persistent, it will not return the same record twice,
-//     // even if this script is restarted.
-//     for (name, balance) in iter.take(CHUNK_SIZE) {
-//         new_map.put(&name, balance);
-//     }
-// })?;
-// // Here, the iterator has run out of items. The script can now perform
-// // other actions if necessary.
-// # Ok(())
-// # }
-// ```
-//
-// [persistent iterators]: struct.PersistentIter.html
+/// ## Using persistent iterators
+///
+/// `MigrationHelper` offers the [`Self::iter_loop()`] method, which allows to further
+/// simplify working with [persistent iterators](PersistentIter).
+///
+/// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
+/// from time to time. To do this, we use the following script:
+///
+/// ```
+/// # use matterdb::{access::AccessExt, TemporaryDB};
+/// # use matterdb::migration::{MigrationHelper, MigrationError};
+/// /// Number of accounts processed per DB merge.
+/// const CHUNK_SIZE: usize = 100;
+///
+/// let db = TemporaryDB::new();
+/// let mut helper = MigrationHelper::new(db, "test");
+/// helper.iter_loop(|helper, iters| {
+///     // The data before migration is stored in this map
+///     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
+///     // ...and the new data is in this merkelized map.
+///     let mut new_map = helper.new_data().get_map::<_, str, u64>("wallets");
+///
+///     // Create an iterator over the old data.
+///     let iter = iters.create("wallets", &old_map);
+///     // Take a fixed amount of records from the iterator and migrate them.
+///     // Since `iter` is persistent, it will not return the same record twice,
+///     // even if this script is restarted.
+///     for (name, balance) in iter.take(CHUNK_SIZE) {
+///         new_map.put(&name, balance);
+///     }
+/// })?;
+/// // Here, the iterator has run out of items. The script can now perform
+/// // other actions if necessary.
+/// # anyhow::Ok(())
+/// ```
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
     abort_handle: Box<dyn AbortMigration>,
@@ -401,9 +375,7 @@ impl MigrationHelper {
     /// Merges the changes to the migrated data and the scratchpad to the database.
     ///
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`flush_migration`] to flush the migrated data.
-    ///
-    /// [`flush_migration`]: fn.flush_migration.html
+    /// Use [`flush_migration()`] to flush the migrated data.
     ///
     /// # Errors
     ///
@@ -448,9 +420,7 @@ impl MigrationHelper {
     /// Returns hash representing migrated data state, or an error if the merge has failed.
     ///
     /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`flush_migration`] to flush the migrated data.
-    ///
-    /// [`flush_migration`]: fn.flush_migration.html
+    /// Use [`flush_migration()`] to flush the migrated data.
     ///
     /// # Errors
     ///

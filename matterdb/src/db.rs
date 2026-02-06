@@ -240,18 +240,18 @@ pub(crate) enum Change {
 /// A combination of a database snapshot and changes on top of it.
 ///
 /// A `Fork` provides both immutable and mutable operations over the database by implementing
-/// the [`RawAccessMut`] trait. Like [`Snapshot`], `Fork` provides read isolation.
+/// the [`RawAccessMut`](crate::access::RawAccessMut) trait. Like [`Snapshot`], `Fork` provides read isolation.
 /// When mutable operations are applied to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
 /// To apply the changes to the database, you need to convert a `Fork` into a [`Patch`] using
-/// [`into_patch`] and then atomically [`merge`] it into the database. If two
+/// [`Self::into_patch()`] and then atomically [`merge`](Database::merge()) it into the database. If two
 /// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
 /// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports checkpoints ([`flush`] and [`rollback`] methods), which allows
-/// rolling back the latest changes. A checkpoint is created automatically after calling
+/// `Fork` also supports checkpoints ([`flush`](Self::flush()) and [`rollback`](Self::rollback()) methods),
+/// which allows rolling back the latest changes. A checkpoint is created automatically after calling
 /// the `flush` method.
 ///
 /// ```
@@ -289,7 +289,7 @@ pub(crate) enum Change {
 /// let index2 = fork.get_list::<_, u8>("index");
 /// ```
 ///
-/// To enable immutable / shared references to indexes, you may use [`readonly`] method:
+/// To enable immutable / shared references to indexes, you may use [`readonly()`](Self::readonly()) method:
 ///
 /// ```
 /// # use matterdb::{access::CopyAccessExt, TemporaryDB, ListIndex, Database};
@@ -309,17 +309,6 @@ pub(crate) enum Change {
 /// Shared references work like `RefCell::borrow()`; it is a runtime error to try to obtain
 /// a shared reference to an index if there is an exclusive reference to the same index,
 /// and vice versa.
-///
-/// [`RawAccessMut`]: access/trait.RawAccessMut.html
-/// [`Snapshot`]: trait.Snapshot.html
-/// [`Patch`]: struct.Patch.html
-/// [`into_patch`]: #method.into_patch
-/// [`merge`]: trait.Database.html#tymethod.merge
-/// [`commit`]: #method.commit
-/// [`flush`]: #method.flush
-/// [`rollback`]: #method.rollback
-/// [`readonly`]: #method.readonly
-/// [`RefCell::borrow_mut()`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html#method.borrow_mut
 #[derive(Debug)]
 pub struct Fork {
     patch: Patch,
@@ -377,8 +366,8 @@ enum NextIterValue {
 ///
 /// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
-/// There is no way to directly interact with data in the database; use [`snapshot`], [`fork`]
-/// and [`merge`] methods for indirect interaction. See [the crate-level documentation](index.html)
+/// There is no way to directly interact with data in the database; use [`Self::snapshot()`], [`Self::fork()`]
+/// and [`Self::merge()`] for indirect interaction. See [the crate-level documentation](crate)
 /// for more details.
 ///
 /// Note that `Database` effectively has [interior mutability][interior-mut];
@@ -455,9 +444,6 @@ enum NextIterValue {
 /// workflow should only be used for minor changes, for which the proof that a patch does not overlap
 /// with concurrent patches is tractable.
 ///
-/// [`snapshot`]: #tymethod.snapshot
-/// [`fork`]: #method.fork
-/// [`merge`]: #tymethod.merge
 /// [interior-mut]: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
@@ -619,7 +605,7 @@ pub trait Snapshot: Send + Sync + 'static {
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
-/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
+/// the standard [`Iterator`](std::iter::Iterator)
 /// trait, `Iterator` in `MatterDB` is low-level and, therefore, operates with bytes.
 pub trait Iterator {
     /// Advances the iterator and returns a reference to the next key and value.

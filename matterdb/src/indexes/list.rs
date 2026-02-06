@@ -19,8 +19,6 @@ use crate::{
 /// `ListIndex` implements an array list, storing the elements as values and
 /// using `u64` as an index. `ListIndex` requires that elements implement the
 /// [`BinaryValue`] trait.
-///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,

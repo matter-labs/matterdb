@@ -3,16 +3,17 @@
 //! # Overview
 //!
 //! The core type in this module is the [`Access`] trait, which provides ability to access
-//! [indexes] from the database. The `Access` trait has several implementations:
+//! [indexes](crate::indexes) from the database. The `Access` trait has several implementations:
 //!
 //! - `Access` is implemented for [`RawAccess`]es, that is, types that provide access to the
-//!   entire database. [`Snapshot`], [`Fork`] and [`ReadonlyFork`] fall into this category.
+//!   entire database. [`Snapshot`](crate::Snapshot), [`Fork`](crate::Fork) and [`ReadonlyFork`](crate::ReadonlyFork)
+//!   fall into this category.
 //! - [`Prefixed`] restricts an access to a single *namespace*.
-//! - [`Migration`]s are used for data created during [migrations]. Similar to `Prefixed`, migrations
-//!   are separated by namespaces.
-//! - [`Scratchpad`]s can be used for temporary data. They are distinguished by namespaces as well.
+//! - [`Migration`](crate::migration::Migration)s are used for data created during [migrations](crate::migration).
+//!   Similar to `Prefixed`, migrations are separated by namespaces.
+//! - [`Scratchpad`](crate::migration::Scratchpad)s can be used for temporary data. They are distinguished by namespaces as well.
 //!
-//! [`CopyAccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
+//! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
 //! is useful in quick-and-dirty testing. For more complex applications, consider deriving
 //! data schema via [`FromAccess`].
 //!
@@ -27,19 +28,6 @@
 //! - However, if we consider multiple accesses, indexes can alias. For example, an index
 //!   with address `bar` from a `Prefixed<&Fork>` in namespace `foo` can also be accessed via
 //!   address `foo.bar` from the underlying `Fork`.
-//!
-//! [`Access`]: trait.Access.html
-//! [indexes]: ../index.html#indexes
-//! [`RawAccess`]: trait.RawAccess.html
-//! [`Snapshot`]: ../trait.Snapshot.html
-//! [`Fork`]: ../struct.Fork.html
-//! [`ReadonlyFork`]: ../struct.ReadonlyFork.html
-//! [`Prefixed`]: struct.Prefixed.html
-//! [`Migration`]: ../migration/struct.Migration.html
-//! [migrations]: ../migration/index.html
-//! [`Scratchpad`]: ../migration/struct.Scratchpad.html
-//! [`CopyAccessExt`]: trait.CopyAccessExt.html
-//! [`FromAccess`]: trait.FromAccess.html
 
 use std::fmt;
 
@@ -59,9 +47,7 @@ mod extensions;
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
 /// it instantiates several crate-private types. Correspondingly, `Access` methods
-/// rarely need to be used directly; use [its extension trait][`CopyAccessExt`] instead.
-///
-/// [`CopyAccessExt`]: trait.CopyAccessExt.html
+/// rarely need to be used directly; use [its extension trait](AccessExt) instead.
 ///
 /// # Examples
 ///
@@ -107,9 +93,7 @@ pub trait Access: Clone {
     /// Returns an iterator over keys in a group with the specified address.
     ///
     /// The iterator buffers keys in memory and may become inconsistent for accesses
-    /// based on [`ReadonlyFork`].
-    ///
-    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
+    /// based on [`ReadonlyFork`](crate::ReadonlyFork).
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized;
@@ -145,10 +129,7 @@ impl<T: RawAccess> Access for T {
 /// separation. A set of indexes to which `Prefixed` provides access does not intersect
 /// with a set of indexes accessed by a `Prefixed` instance with another prefix. Additionally,
 /// index in `Prefixed` accesses do not intersect with indexes in special-purpose `Access`
-/// implementations ([`Migration`]s and [`Scratchpad`]s).
-///
-/// [`Migration`]: ../migration/struct.Migration.html
-/// [`Scratchpad`]: ../migration/struct.Scratchpad.html
+/// implementations ([`Migration`](crate::migration::Migration)s and [`Scratchpad`](crate::migration::Scratchpad)s).
 ///
 /// # Examples
 ///
@@ -173,9 +154,7 @@ impl<T: RawAccess> Prefixed<T> {
     ///
     /// # Panics
     ///
-    /// - Will panic if the prefix is not a [valid prefix name].
-    ///
-    /// [valid prefix name]: ../validation/fn.is_valid_index_name_component.html
+    /// - Will panic if the prefix is not a [valid prefix name](crate::validation::is_valid_index_name_component()).
     pub fn new(prefix: impl Into<String>, access: T) -> Self {
         let prefix = prefix.into();
         assert_valid_name_component(prefix.as_ref());
@@ -272,12 +251,9 @@ pub enum AccessErrorKind {
 /// The access to DB can be readonly or read-write, depending on the `T: Access` type param.
 /// Most object should implement `FromAccess<T>` for all `T: Access`.
 ///
-/// Simplest `FromAccess` implementors are indexes; it is also implemented for [`Lazy`] and [`Group`].
+/// Simplest `FromAccess` implementors are indexes; it is also implemented for [`Group`](crate::Group).
 /// `FromAccess` can be implemented for more complex *components*. Thus, `FromAccess` can
 /// be used to compose storage objects from simpler ones.
-///
-/// [`Lazy`]: ../struct.Lazy.html
-/// [`Group`]: ../indexes/group/struct.Group.html
 ///
 /// # Examples
 ///

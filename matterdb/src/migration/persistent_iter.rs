@@ -77,12 +77,12 @@ where
 /// Like indexes, persistent iterators are identified by an address. Likewise, they are subject
 /// to the borrowing rules (e.g., attempting to create two instances of the same iterator will
 /// result in a runtime error). When migrating data, it makes sense to store iterators
-/// in the associated [`Scratchpad`]. In this way, iterators will be automatically removed
+/// in the associated [`Scratchpad`](crate::migration::Scratchpad). In this way, iterators will be automatically removed
 /// when the migration is over.
 ///
 /// # Examples
 ///
-/// [`MigrationHelper`] offers convenient iterator API via `iter_loop` method, which covers
+/// [`MigrationHelper`](super::MigrationHelper) offers convenient iterator API via `iter_loop` method, which covers
 /// basic use cases. When `iter_loop` is not enough, a persistent iterator can be instantiated
 /// independently:
 ///
@@ -117,9 +117,6 @@ where
 /// assert_eq!(item, "100");
 /// assert_eq!(iter.count(), 22); // number of remaining items
 /// ```
-///
-/// [`Scratchpad`]: struct.Scratchpad.html
-/// [`MigrationHelper`]: struct.MigrationHelper.html
 pub struct PersistentIter<'a, T: RawAccess, I: IndexIterator> {
     inner: Inner<'a, T, I>,
 }
@@ -248,8 +245,6 @@ where
 ///
 /// This iterator can be used similarly to [`PersistentIter`]; the only difference is the
 /// type of items yielded by the iterator.
-///
-/// [`PersistentIter`]: struct.PersistentIter.html
 pub struct PersistentKeys<'a, T: RawAccess, I: IndexIterator> {
     base_iter: PersistentIter<'a, T, I>,
 }

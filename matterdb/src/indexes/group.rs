@@ -117,20 +117,15 @@ where
     /// Iterator over keys in this group.
     ///
     /// The iterator buffers keys in memory and may become inconsistent. Although
-    /// the Rust type system prevents iterating over keys in a group based on [`Fork`],
-    /// it it still possible to make the iterator return inconsistent results. Indeed,
-    /// for a group is based on [`ReadonlyFork`], it is possible to add new indexes via `Fork`
+    /// the Rust type system prevents iterating over keys in a group based on [`Fork`](crate::Fork),
+    /// it is still possible to make the iterator return inconsistent results. Indeed,
+    /// for a group is based on [`ReadonlyFork`](crate::ReadonlyFork), it is possible to add new indexes via `Fork`
     /// while the iteration is in progress.
     ///
     /// For this reason, it is advised to use this method for groups based on `ReadonlyFork`
     /// only in the case where stale reads are tolerated or are prevented on the application level.
-    /// Groups based on [`Snapshot`] implementations (including [`Patch`]es) are not affected
+    /// Groups based on [`Snapshot`](crate::Snapshot) implementations (including [`Patch`](crate::Patch)es) are not affected
     /// by this issue.
-    ///
-    /// [`Fork`]: ../struct.Fork.html
-    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
-    /// [`Snapshot`]: ../trait.Snapshot.html
-    /// [`Patch`]: ../struct.Patch.html
     pub fn keys(&self) -> GroupKeys<T::Base, K> {
         self.access.clone().group_keys(self.prefix.clone())
     }
