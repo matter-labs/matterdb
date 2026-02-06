@@ -20,8 +20,7 @@ use std::{
 
 use matterdb::{
     BinaryKey, BinaryValue, Database, Fork, IndexAddress, IndexType, Snapshot, TemporaryDB,
-    access::{Access, AccessExt, Prefixed, RawAccessMut},
-    generic::{ErasedAccess, IntoErased},
+    access::{Access, AccessExt, Prefixed, RawAccess, RawAccessMut},
     indexes::IndexIterator,
 };
 use proptest::{
@@ -289,38 +288,78 @@ where
     Ok(())
 }
 
-fn check_iterators_run<K, V>(
+/// Specialized version of `fn(&T) -> impl Access<'_>` that allows to capture the lifetime constraint.
+trait AccessExtractor<T: ?Sized>: Copy {
+    type Output<'r>: 'r + Access
+    where
+        Self: 'r,
+        T: 'r;
+
+    fn extract<'r>(&self, base: &'r T) -> Self::Output<'r>;
+}
+
+impl<T: 'static + ?Sized> AccessExtractor<T> for ()
+where
+    for<'r> &'r T: Access,
+{
+    type Output<'r> = &'r T;
+
+    fn extract<'r>(&self, base: &'r T) -> Self::Output<'r> {
+        base
+    }
+}
+
+impl<T: 'static + ?Sized> AccessExtractor<T> for &'static str
+where
+    for<'r> &'r T: RawAccess,
+{
+    type Output<'r> = Prefixed<&'r T>;
+
+    fn extract<'r>(&self, base: &'r T) -> Self::Output<'r> {
+        Prefixed::new(*self, base)
+    }
+}
+
+fn check_iterators_run<K, V, F>(
     db: &TemporaryDB,
     content: &mut [IndexContent<K, V>],
-    fork_extractor: fn(&Fork) -> ErasedAccess<'_>,
-    snapshot_extractor: fn(&dyn Snapshot) -> ErasedAccess<'_>,
+    fork_extractor: F,
+    snapshot_extractor: impl AccessExtractor<dyn Snapshot>,
 ) -> TestCaseResult
 where
     K: Clone + Eq + Ord + BinaryKey<Owned = K> + Debug,
     V: Clone + PartialEq + BinaryValue + Debug,
+    F: AccessExtractor<Fork>,
+    for<'r> <F::Output<'r> as Access>::Base: RawAccessMut,
 {
     let mut fork = db.fork();
-    let fork_access = fork_extractor(&fork);
-    for index_content in &mut *content {
-        index_content.fill(&fork_access);
-    }
-    for index_content in &*content {
-        index_content.check(&fork_access)?;
+    {
+        let fork_access = fork_extractor.extract(&fork);
+        for index_content in &mut *content {
+            index_content.fill(&fork_access);
+        }
+        for index_content in &*content {
+            index_content.check(&fork_access)?;
+        }
     }
     fork.flush();
-    let fork_access = fork_extractor(&fork);
-    for index_content in &*content {
-        index_content.check(&fork_access)?;
+    {
+        let fork_access = fork_extractor.extract(&fork);
+        for index_content in &*content {
+            index_content.check(&fork_access)?;
+        }
     }
 
     let patch = fork.into_patch();
-    let patch_access = snapshot_extractor(&patch);
-    for index_content in &*content {
-        index_content.check(&patch_access)?;
+    {
+        let patch_access = snapshot_extractor.extract(&patch);
+        for index_content in &*content {
+            index_content.check(&patch_access)?;
+        }
     }
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
-    let snapshot_access = snapshot_extractor(&snapshot);
+    let snapshot_access = snapshot_extractor.extract(snapshot.as_ref());
     for index_content in &*content {
         index_content.check(&snapshot_access)?;
     }
@@ -328,15 +367,17 @@ where
     Ok(())
 }
 
-fn check_iterators<K, V>(
+fn check_iterators<K, V, F>(
     db: &TemporaryDB,
     mut content: Vec<IndexContent<K, V>>,
-    fork_extractor: fn(&Fork) -> ErasedAccess<'_>,
-    snapshot_extractor: fn(&dyn Snapshot) -> ErasedAccess<'_>,
+    fork_extractor: F,
+    snapshot_extractor: impl AccessExtractor<dyn Snapshot>,
 ) -> TestCaseResult
 where
     K: Clone + Eq + Ord + BinaryKey<Owned = K> + Debug,
     V: Clone + PartialEq + BinaryValue + Debug,
+    F: AccessExtractor<Fork>,
+    for<'r> <F::Output<'r> as Access>::Base: RawAccessMut,
 {
     check_iterators_run(db, &mut content, fork_extractor, snapshot_extractor)?;
 
@@ -354,12 +395,7 @@ where
     K: Clone + Eq + Ord + BinaryKey<Owned = K> + Debug,
     V: Clone + PartialEq + BinaryValue + Debug,
 {
-    check_iterators(
-        db,
-        content,
-        |fork| fork.into_erased(),
-        |snapshot| snapshot.into_erased(),
-    )
+    check_iterators(db, content, (), ())
 }
 
 fn check_iterators_prefixed<K, V>(
@@ -371,12 +407,7 @@ where
     V: Clone + PartialEq + BinaryValue + Debug,
 {
     const NAMESPACE: &str = "namespace";
-    check_iterators(
-        db,
-        content,
-        |fork| Prefixed::new(NAMESPACE, fork).into_erased(),
-        |snapshot| Prefixed::new(NAMESPACE, snapshot).into_erased(),
-    )
+    check_iterators(db, content, NAMESPACE, NAMESPACE)
 }
 
 fn test_iterators<K, V>(
@@ -392,7 +423,7 @@ fn test_iterators<K, V>(
         let result = check(&db, content);
         // Clear database in any case; otherwise, side-effect errors will prevent determining
         // the true error cause.
-        db.clear().unwrap();
+        db.clear();
         result?;
     });
 }
