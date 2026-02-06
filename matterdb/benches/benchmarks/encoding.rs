@@ -1,6 +1,5 @@
 use std::{borrow::Cow, fmt, hint::black_box};
 
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{Bencher, Criterion};
 use matterdb::BinaryValue;
 use rand::{RngCore, SeedableRng, rngs::StdRng};
@@ -18,43 +17,17 @@ struct SimpleData {
 impl BinaryValue for SimpleData {
     fn to_bytes(&self) -> Vec<u8> {
         let mut buffer = vec![0; 8];
-        LittleEndian::write_u16(&mut buffer[0..2], self.id);
-        LittleEndian::write_i16(&mut buffer[2..4], self.class);
-        LittleEndian::write_i32(&mut buffer[4..8], self.value);
+        buffer[0..2].copy_from_slice(&self.id.to_le_bytes());
+        buffer[2..4].copy_from_slice(&self.class.to_le_bytes());
+        buffer[4..8].copy_from_slice(&self.value.to_le_bytes());
         buffer
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let bytes = bytes.as_ref();
-        let id = LittleEndian::read_u16(&bytes[0..2]);
-        let class = LittleEndian::read_i16(&bytes[2..4]);
-        let value = LittleEndian::read_i32(&bytes[4..8]);
-        Ok(Self { id, class, value })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct CursorData {
-    id: u16,
-    class: i16,
-    value: i32,
-}
-
-impl BinaryValue for CursorData {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = vec![0; 8];
-        let mut cursor = buf.as_mut_slice();
-        cursor.write_u16::<LittleEndian>(self.id).unwrap();
-        cursor.write_i16::<LittleEndian>(self.class).unwrap();
-        cursor.write_i32::<LittleEndian>(self.value).unwrap();
-        buf
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        let mut cursor = bytes.as_ref();
-        let id = cursor.read_u16::<LittleEndian>()?;
-        let class = cursor.read_i16::<LittleEndian>()?;
-        let value = cursor.read_i32::<LittleEndian>()?;
+        let id = u16::from_le_bytes(bytes[0..2].try_into().unwrap());
+        let class = i16::from_le_bytes(bytes[2..4].try_into().unwrap());
+        let value = i32::from_le_bytes(bytes[4..8].try_into().unwrap());
         Ok(Self { id, class, value })
     }
 }
@@ -77,14 +50,6 @@ where
 
 fn gen_sample_data() -> SimpleData {
     check_binary_value(SimpleData {
-        id: 1,
-        class: -5,
-        value: 2127,
-    })
-}
-
-fn gen_cursor_data() -> CursorData {
-    check_binary_value(CursorData {
         id: 1,
         class: -5,
         value: 2127,
@@ -131,5 +96,4 @@ where
 pub(crate) fn bench_encoding(c: &mut Criterion) {
     bench_binary_value(c, "bytes", gen_bytes_data);
     bench_binary_value(c, "simple", gen_sample_data);
-    bench_binary_value(c, "cursor", gen_cursor_data);
 }

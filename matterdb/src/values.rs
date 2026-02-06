@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 
 use anyhow::{self, Context, format_err};
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, TimeZone, Utc};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -69,24 +68,21 @@ macro_rules! impl_binary_value_scalar {
                 vec![*self as u8]
             }
 
+            #[allow(clippy::cast_possible_wrap)]
             fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-                use byteorder::ReadBytesExt;
-                bytes.as_ref().$read().map_err(From::from)
+                Ok(bytes.get(0).copied().context("unexpected EOF")? as Self)
             }
         }
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
-        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
-                let mut v = vec![0; $len];
-                LittleEndian::$write(&mut v, *self);
-                v
+                self.to_le_bytes().to_vec()
             }
 
             fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-                use byteorder::ReadBytesExt;
-                bytes.as_ref().$read::<LittleEndian>().map_err(From::from)
+                let bytes = bytes.first_chunk().context("unexpected EOF")?;
+                Ok(Self::from_le_bytes(*bytes))
             }
         }
     };
@@ -157,18 +153,19 @@ impl BinaryValue for String {
 impl BinaryValue for DateTime<Utc> {
     fn to_bytes(&self) -> Vec<u8> {
         let secs = self.timestamp();
+        assert!(secs >= 0, "Cannot write negative timestamp");
         let nanos = self.timestamp_subsec_nanos();
 
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        let mut buffer = Vec::with_capacity(12);
+        buffer.extend_from_slice(&secs.to_le_bytes());
+        buffer.extend_from_slice(&nanos.to_le_bytes());
         buffer
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        let mut value = bytes.as_ref();
-        let secs = value.read_i64::<LittleEndian>()?;
-        let nanos = value.read_u32::<LittleEndian>()?;
+        let secs = i64::from_le_bytes(*bytes.first_chunk().context("unexpected EOF")?);
+        let bytes = &bytes[8..]; // skip the read `secs`
+        let nanos = u32::from_le_bytes(*bytes.first_chunk().context("unexpected EOF")?);
         Utc.timestamp_opt(secs, nanos)
             .single()
             .with_context(|| format!("stored timestamp out of range: {secs}, {nanos}"))

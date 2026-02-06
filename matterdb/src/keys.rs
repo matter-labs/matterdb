@@ -1,6 +1,5 @@
 //! A definition of `BinaryKey` trait and implementations for common types.
 
-use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, TimeZone, Utc};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
@@ -114,7 +113,7 @@ impl BinaryKey for i8 {
 // spell-checker:ignore utype, itype, vals, ints
 
 macro_rules! storage_key_for_ints {
-    ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {
+    ($utype:ident, $itype:ident, $size:expr) => {
         /// Uses big-endian encoding.
         impl BinaryKey for $utype {
             fn size(&self) -> usize {
@@ -122,12 +121,13 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, *self);
+                buffer.copy_from_slice(&self.to_be_bytes());
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer)
+                let buffer = buffer.try_into().expect("unexpected buffer size");
+                Self::from_be_bytes(buffer)
             }
         }
 
@@ -140,21 +140,23 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, self.wrapping_add(Self::MIN) as $utype);
+                let unsigned_value = self.wrapping_add(Self::MIN) as $utype;
+                buffer.copy_from_slice(&unsigned_value.to_be_bytes());
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer).wrapping_sub(Self::MIN as $utype) as Self
+                let buffer = buffer.try_into().expect("unexpected buffer size");
+                $utype::from_be_bytes(buffer).wrapping_sub(Self::MIN as $utype) as Self
             }
         }
     };
 }
 
-storage_key_for_ints! {u16, i16, 2, read_u16, write_u16}
-storage_key_for_ints! {u32, i32, 4, read_u32, write_u32}
-storage_key_for_ints! {u64, i64, 8, read_u64, write_u64}
-storage_key_for_ints! {u128, i128, 16, read_u128, write_u128}
+storage_key_for_ints! {u16, i16, 2}
+storage_key_for_ints! {u32, i32, 4}
+storage_key_for_ints! {u64, i64, 8}
+storage_key_for_ints! {u128, i128, 16}
 
 impl BinaryKey for Vec<u8> {
     fn size(&self) -> usize {

@@ -23,7 +23,6 @@ categories = ["data-structures", "database"]
 anyhow = "1.0"
 assert_matches = "1.5"
 bincode = "2"
-byteorder = "1.5"
 chrono = "0.4.42"
 criterion = "0.8"
 modifier = "0.1"

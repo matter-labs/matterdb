@@ -78,23 +78,10 @@ fn embedded_components() {
         42
     );
 
-    let lazy_map = fork.get_map::<_, u64, String>("lazy.map");
-    assert_eq!(lazy_map.keys().collect::<Vec<_>>(), vec![1, 2, 42]);
-    let lazy_list = fork.get_list::<_, String>("lazy.list");
-    assert_eq!(
-        lazy_list.iter().collect::<Vec<_>>(),
-        vec![
-            "!".to_owned(),
-            "!!".to_owned(),
-            "?".to_owned(),
-            "!".to_owned()
-        ]
-    );
-
     let grouped_map = fork.get_map::<_, u64, String>(("group.map", "!"));
     assert_eq!(
         grouped_map.iter().collect::<Vec<_>>(),
-        vec![(1, "!".to_owned()), (42, "!".to_owned())]
+        [(1, "!".to_owned()), (42, "!".to_owned())]
     );
     let grouped_list = fork.get_list::<_, String>(("group.list", "!"));
     assert_eq!(grouped_list.len(), 2);

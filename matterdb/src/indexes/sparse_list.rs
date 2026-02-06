@@ -3,9 +3,10 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-use std::{io::Error, marker::PhantomData};
-
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::{
+    io::{Error, Read},
+    marker::PhantomData,
+};
 
 use crate::{
     BinaryValue,
@@ -31,15 +32,20 @@ impl BinaryAttribute for SparseListSize {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.write_u64::<LittleEndian>(self.capacity).unwrap();
-        buffer.write_u64::<LittleEndian>(self.length).unwrap();
+        buffer.extend_from_slice(&self.capacity.to_le_bytes());
+        buffer.extend_from_slice(&self.length.to_le_bytes());
     }
 
     fn read(mut buffer: &[u8]) -> Result<Self, Error> {
-        Ok(Self {
-            capacity: buffer.read_u64::<LittleEndian>()?,
-            length: buffer.read_u64::<LittleEndian>()?,
-        })
+        let mut capacity_bytes = [0_u8; 8];
+        buffer.read_exact(&mut capacity_bytes)?;
+        let capacity = u64::from_le_bytes(capacity_bytes);
+
+        let mut length_bytes = [0_u8; 8];
+        buffer.read_exact(&mut length_bytes)?;
+        let length = u64::from_le_bytes(length_bytes);
+
+        Ok(Self { capacity, length })
     }
 }
 

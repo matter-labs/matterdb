@@ -11,9 +11,7 @@ description = "Persistent storage implementation based on RocksDB"
 readme = "README.md"
 
 [dependencies]
-# FIXME: make deps optional where appropriate
 anyhow.workspace = true
-byteorder.workspace = true
 chrono.workspace = true
 rocksdb.workspace = true
 serde = { workspace = true, features = ["derive"] }
