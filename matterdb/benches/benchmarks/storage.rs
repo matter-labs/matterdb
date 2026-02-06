@@ -14,11 +14,7 @@ const SAMPLE_SIZE: usize = 10;
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 32] = [100; 32];
 
-#[cfg(all(test, not(feature = "long_benchmarks")))]
 const ITEM_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
-
-#[cfg(all(test, feature = "long_benchmarks"))]
-const ITEM_COUNTS: [usize; 4] = [1_000, 10_000, 100_000, 1_000_000];
 
 fn generate_random_kv(len: usize) -> Vec<(u32, Vec<u8>)> {
     let mut key = 0;

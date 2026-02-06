@@ -43,7 +43,7 @@ impl<T: RawAccess> fmt::Debug for ViewInner<T> {
 }
 
 /// Utility trait to provide optional references to `ViewChanges`.
-#[allow(unreachable_pub)] // FIXME: probably will be removed
+#[allow(unreachable_pub)]
 pub trait ChangeSet {
     fn as_ref(&self) -> Option<&ViewChanges>;
     /// Provides mutable reference to changes. The implementation for a `RawAccessMut` type
@@ -315,7 +315,6 @@ impl<T: RawAccess> View<T> {
 }
 
 impl<T: RawAccessMut> View<T> {
-    // FIXME: outdated?
     fn changes_mut(&mut self) -> &mut ViewChanges {
         const ACCESS_ERROR: &str = "Attempt to modify a readonly view of the database using a generic access. \
              The caller should check the access type before calling any mutable methods";

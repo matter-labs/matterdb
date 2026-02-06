@@ -37,20 +37,5 @@ name = "criterion"
 path = "benches/lib.rs"
 harness = false
 
-[features]
-# FIXME: revise features
-default = ["rocksdb_snappy"]
-with-serde = []
-
-# Compression options passed to RocksDB backend.
-rocksdb_snappy = ["rocksdb/snappy"]
-rocksdb_lz4 = ["rocksdb/lz4"]
-rocksdb_zlib = ["rocksdb/zlib"]
-rocksdb_zstd = ["rocksdb/zstd"]
-rocksdb_bzip2 = ["rocksdb/bzip2"]
-
-# Enables long benchmarks; does not influence main crate code.
-long_benchmarks = []
-
 [lints]
 workspace = true
