@@ -87,7 +87,7 @@ where
 /// independently:
 ///
 /// ```
-/// # use matterdb::{access::{AccessExt, CopyAccessExt}, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// # use matterdb::migration::{MigrationHelper, PersistentIter};
 /// let db = TemporaryDB::new();
 /// // Create data for migration.

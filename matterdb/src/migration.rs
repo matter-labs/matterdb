@@ -234,7 +234,7 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 ///
 /// ```
 /// # use assert_matches::assert_matches;
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB};
+/// # use matterdb::{access::AccessExt, TemporaryDB};
 /// # use matterdb::migration::{MigrationHelper, MigrationError};
 /// # use std::{sync::mpsc, thread, time::Duration};
 /// let db = TemporaryDB::new();

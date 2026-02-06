@@ -106,7 +106,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -129,7 +129,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -149,7 +149,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -174,7 +174,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -198,7 +198,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -219,7 +219,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -240,7 +240,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -262,7 +262,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -290,7 +290,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -313,7 +313,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -349,7 +349,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -382,7 +382,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -421,7 +421,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -444,7 +444,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();

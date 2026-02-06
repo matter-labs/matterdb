@@ -255,7 +255,7 @@ pub(crate) enum Change {
 /// the `flush` method.
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let mut fork = db.fork();
 /// fork.get_list("list").extend(vec![1_u32, 2]);
@@ -281,7 +281,7 @@ pub(crate) enum Change {
 /// For example the code below will panic at runtime.
 ///
 /// ```rust,should_panic
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB, ListIndex, Database};
+/// # use matterdb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let index = fork.get_list::<_, u8>("index");
@@ -292,7 +292,7 @@ pub(crate) enum Change {
 /// To enable immutable / shared references to indexes, you may use [`readonly()`](Self::readonly()) method:
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB, ListIndex, Database};
+/// # use matterdb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list::<_, u8>("index").extend(vec![1, 2, 3]);
@@ -324,14 +324,14 @@ pub struct Fork {
 ///
 /// ```
 /// # use matterdb::{
-/// #     access::CopyAccessExt, Database, Patch, TemporaryDB,
+/// #     access::AccessExt, Database, Patch, TemporaryDB,
 /// # };
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list("list").extend(vec![1_i32, 2, 3]);
 /// let patch: Patch = fork.into_patch();
 /// // The patch contains changes recorded in the fork.
-/// let list = patch.get_list::<_, i32>("list");
+/// let list = patch.as_ref().get_list::<_, i32>("list");
 /// assert_eq!(list.len(), 3);
 /// ```
 #[derive(Debug)]
@@ -375,7 +375,7 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// use matterdb::{access::AccessExt, Database, TemporaryDB};
 ///
 /// // not declared as `mut db`!
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
@@ -424,7 +424,7 @@ enum NextIterValue {
 ///
 /// ```
 /// // NEVER USE THIS PATTERN!
-/// # use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let first_fork = db.fork();
 /// first_fork.get_list("list").extend(vec![1, 2, 3]);
@@ -509,7 +509,7 @@ pub trait Database: Send + Sync + 'static {
     /// and then applying backups in the reverse order:
     ///
     /// ```
-    /// # use matterdb::{access::{Access, CopyAccessExt}, Database, DatabaseExt, TemporaryDB};
+    /// # use matterdb::{access::{Access, AccessExt}, Database, TemporaryDB};
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
     /// fork.get_list("list").push(1_u32);
@@ -525,16 +525,16 @@ pub trait Database: Send + Sync + 'static {
     ///     view.get_list("list").iter().collect()
     /// }
     ///
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2, 3, 4]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1, 2, 3, 4]);
     /// // Rollback the most recent merge.
     /// db.merge(backup3).unwrap();
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1, 2]);
     /// // ...Then the penultimate merge.
     /// db.merge(backup2).unwrap();
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1]);
     /// // ...Then the oldest one.
     /// db.merge(backup1).unwrap();
-    /// assert!(enumerate_list(&db.snapshot()).is_empty());
+    /// assert!(enumerate_list(db.snapshot().as_ref()).is_empty());
     /// ```
     ///
     /// # Performance notes
@@ -743,7 +743,7 @@ impl<'a> RawAccess for &'a Fork {
 /// # Examples
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, ReadonlyFork, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list("list").push(1_u32);
@@ -761,7 +761,7 @@ impl<'a> RawAccess for &'a Fork {
 /// There are no write methods in indexes instantiated from `ReadonlyFork`:
 ///
 /// ```compile_fail
-/// # use matterdb::{access::CopyAccessExt, Database, ReadonlyFork, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let readonly: ReadonlyFork<'_> = fork.readonly();

@@ -27,7 +27,7 @@ const MIGRATION_CHAR: u8 = b'^';
 /// be converted into an address.
 ///
 /// ```
-/// use matterdb::{access::CopyAccessExt, IndexAddress, TemporaryDB, Database};
+/// use matterdb::{access::AccessExt, IndexAddress, TemporaryDB, Database};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();

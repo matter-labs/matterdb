@@ -134,7 +134,7 @@ impl<T: RawAccess> Access for T {
 /// # Examples
 ///
 /// ```
-/// use matterdb::{access::{AccessExt, CopyAccessExt, Prefixed}, Database, TemporaryDB};
+/// use matterdb::{access::{AccessExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -263,8 +263,8 @@ pub enum AccessErrorKind {
 /// ```
 /// use matterdb_derive::FromAccess;
 /// # use matterdb::{
-/// #     access::{Access, CopyAccessExt, AccessError, FromAccess, RawAccessMut},
-/// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
+/// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
+/// #     Database, Entry, Group, MapIndex, IndexAddress, TemporaryDB,
 /// # };
 ///
 /// #[derive(FromAccess)]
@@ -295,11 +295,7 @@ pub enum AccessErrorKind {
 /// assert_eq!(map.len.get(), Some(2));
 /// # }
 ///
-/// // Components could be used with `Group` / `Lazy` out of the box:
-/// let lazy_map: Lazy<_, InsertOnlyMap<_>> =
-///     Lazy::from_access(&fork, "test".into())?;
-/// assert_eq!(lazy_map.get().map.get("foo").unwrap(), "FOO");
-///
+/// // Components could be used with `Group` out of the box:
 /// let group_of_maps: Group<_, u16, InsertOnlyMap<_>> =
 ///     fork.get_group("test_group");
 /// group_of_maps.get(&1).insert("baz", "BAZ".to_owned());

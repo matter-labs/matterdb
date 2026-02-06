@@ -15,8 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 /// Implementing `BinaryValue` for the type:
 ///
 /// ```
-/// use std::{borrow::Cow, io::{Read, Write}};
-/// use byteorder::{LittleEndian, ReadBytesExt, ByteOrder};
+/// use std::borrow::Cow;
 /// use matterdb::BinaryValue;
 ///
 /// #[derive(Clone)]
@@ -28,15 +27,15 @@ use chrono::{DateTime, TimeZone, Utc};
 /// impl BinaryValue for Data {
 ///     fn to_bytes(&self) -> Vec<u8> {
 ///         let mut buf = vec![0_u8; 6];
-///         LittleEndian::write_i16(&mut buf[0..2], self.a);
-///         LittleEndian::write_u32(&mut buf[2..6], self.b);
+///         buf[0..2].copy_from_slice(&self.a.to_le_bytes());
+///         buf[2..6].copy_from_slice(&self.b.to_le_bytes());
 ///         buf
 ///     }
 ///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> anyhow::Result<Self> {
 ///         let mut buf = bytes.as_ref();
-///         let a = buf.read_i16::<LittleEndian>()?;
-///         let b = buf.read_u32::<LittleEndian>()?;
+///         let a = i16::from_le_bytes(buf[0..2].try_into().unwrap());
+///         let b = u32::from_le_bytes(buf[2..6].try_into().unwrap());
 ///         Ok(Self { a, b })
 ///     }
 /// }

@@ -21,7 +21,7 @@ use crate::{
 ///
 /// ```
 /// # use matterdb::{
-/// #     access::{Access, CopyAccessExt, FromAccess},
+/// #     access::{Access, AccessExt, FromAccess},
 /// #     Database, Group, ListIndex, TemporaryDB,
 /// # };
 /// type StrGroup<T> = Group<T, str, ListIndex<<T as Access>::Base, u64>>;
@@ -42,7 +42,7 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use matterdb::{access::{CopyAccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
+/// # use matterdb::{access::{AccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let group: Group<_, u64, ListIndex<_, u64>> = fork.get_group("group");
@@ -60,7 +60,7 @@ use crate::{
 /// Group keys can be unsized:
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, Group, ListIndex, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
 /// # let db = TemporaryDB::new();
 /// # let fork = db.fork();
 /// let group: Group<_, str, ListIndex<_, u64>> = fork.get_group("unsized_group");
