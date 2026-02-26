@@ -12,8 +12,6 @@ use crate::{
 ///
 /// You can add an element to this index and check whether it exists. A value
 /// should implement [`BinaryValue`] trait.
-///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct Entry<T: RawAccess, V> {
     base: View<T>,
@@ -49,7 +47,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -68,7 +66,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -93,7 +91,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -111,7 +109,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -132,7 +130,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -158,7 +156,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, Entry};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();

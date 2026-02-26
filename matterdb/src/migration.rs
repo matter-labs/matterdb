@@ -24,43 +24,27 @@
 //! when the migration is finalized.
 //!
 //! Retaining an index in the migration is a no op. *Removing* an index is explicit; it needs
-//! to be performed via [`create_tombstone`] method. Although tombstones do not contain data,
+//! to be performed via [`create_tombstone`](Migration::create_tombstone()) method.
+//! Although tombstones do not contain data,
 //! they behave like indexes in other regards. For example, it is impossible to create a tombstone
 //! and then create an ordinary index at the same address, or vice versa.
 //!
 //! A migration can also store temporary data in a [`Scratchpad`]. This data will be removed
 //! when the migration is finalized.
 //!
-//! Indexes created within a migration are not [aggregated] in the default state hash. Instead,
-//! they are placed in a separate namespace, the aggregator and state hash for which can be
-//! obtained via respective [`Migration`] methods.
-//!
 //! It is possible to periodically persist migrated data to the database
 //! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
 //! to restart the process handling the migration, provided it can recover from such a restart
-//! on the application level. To assist with fault tolerance, use [persistent iterators].
+//! on the application level. To assist with fault tolerance, use [persistent iterators](PersistentIter).
 //!
 //! # Finalizing Migration
 //!
-//! To finalize a migration, one needs to call [`flush_migration`]. This will replace
+//! To finalize a migration, one needs to call [`flush_migration()`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
 //! to the default state aggregator. To roll back a migration,
-//! use [`rollback_migration`]. This will remove the new index data and corresponding metadata.
+//! use [`rollback_migration()`]. This will remove the new index data and corresponding metadata.
 //! Both `flush_migration` and `rollback_migration` will remove the `Scratchpad` associated
 //! with the migration.
-//!
-//! [`Migration`]: struct.Migration.html
-//! [`Prefixed`]: ../access/struct.Prefixed.html
-//! [`create_tombstone`]: struct.Migration.html#method.create_tombstone
-//! [`Scratchpad`]: struct.Scratchpad.html
-//! [aggregated]: ../index.html#state-aggregation
-//! [persistent iterators]: struct.PersistentIter.html
-//! [`flush_migration`]: fn.flush_migration.html
-//! [`rollback_migration`]: fn.rollback_migration.html
-//!
-//! # Examples
-//!
-//! None yet.
 
 use std::{
     fmt,
@@ -78,8 +62,8 @@ use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::{assert_valid_name_component, check_index_valid_full_name},
     views::{
-        AsReadonly, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, RawAccessMut,
-        View, ViewWithMetadata,
+        GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, RawAccessMut, View,
+        ViewWithMetadata,
     },
 };
 
@@ -95,24 +79,10 @@ const SCRATCHPAD_NAME: &str = "__scratchpad__";
 /// after the migration is flushed. The major difference with `Prefixed` is that the indexes
 /// in a migration cannot be accessed in any other way. That is, it is impossible to access
 /// an index in a migration without constructing a `Migration` object first.
-///
-/// [`Prefixed`]: ../access/struct.Prefixed.html
 #[derive(Debug, Clone)]
 pub struct Migration<T> {
     access: T,
     namespace: String,
-}
-
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Migration`.
-impl<T> Migration<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.namespace, self.access)
-    }
 }
 
 impl<T: RawAccess> Migration<T> {
@@ -163,7 +133,6 @@ impl<T: RawAccess> Access for Migration<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let mut prefixed_addr = base_addr.prepend_name(&self.namespace);
         prefixed_addr.set_in_migration();
@@ -181,18 +150,6 @@ impl<T: RawAccess> Access for Migration<T> {
 pub struct Scratchpad<T> {
     access: T,
     namespace: String,
-}
-
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Scratchpad`.
-impl<T> Scratchpad<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.namespace, self.access)
-    }
 }
 
 impl<T: RawAccess> Scratchpad<T> {
@@ -256,7 +213,6 @@ impl<T: RawAccess> Access for Scratchpad<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let base_addr = self.get_scratchpad_prefix(base_addr);
         self.access.group_keys(base_addr)
@@ -267,7 +223,7 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 ///
 /// # Examples
 ///
-/// See the [module docs](index.html) for a basic example of usage.
+/// See the [module docs](crate::migration) for a basic example of usage.
 ///
 /// ## Aborting migration
 ///
@@ -276,12 +232,9 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 /// [`MigrationError::Aborted`]. This is important, e.g., to prevent unnecessary writes
 /// to the database.
 ///
-/// [`AbortHandle`]: struct.AbortHandle.html
-/// [`MigrationError::Aborted`]: enum.MigrationError.html#variant.Aborted
-///
 /// ```
 /// # use assert_matches::assert_matches;
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB};
+/// # use matterdb::{access::AccessExt, TemporaryDB};
 /// # use matterdb::migration::{MigrationHelper, MigrationError};
 /// # use std::{sync::mpsc, thread, time::Duration};
 /// let db = TemporaryDB::new();
@@ -304,46 +257,41 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 /// assert_matches!(res, Err(MigrationError::Aborted));
 /// ```
 ///
-// TODO: The following section was left because I'm not sure what to do with it right now.
-// ## Using persistent iterators
-//
-// `MigrationHelper` offers the [`iter_loop`](#method.iter_loop) method, which allows to further
-// simplify working with [persistent iterators].
-//
-// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
-// from time to time. To do this, we use the following script:
-//
-// ```
-// # use matterdb::{access::AccessExt, TemporaryDB};
-// # use matterdb::migration::{MigrationHelper, MigrationError};
-// # fn main() -> Result<(), MigrationError> {
-// /// Number of accounts processed per DB merge.
-// const CHUNK_SIZE: usize = 100;
-//
-// let db = TemporaryDB::new();
-// let mut helper = MigrationHelper::new(db, "test");
-// helper.iter_loop(|helper, iters| {
-//     // The data before migration is stored in this map
-//     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
-//     // ...and the new data is in this merkelized map.
-//     let mut new_map = helper.new_data().get_map::<_, str, u64>("wallets");
-//
-//     // Create an iterator over the old data.
-//     let iter = iters.create("wallets", &old_map);
-//     // Take a fixed amount of records from the iterator and migrate them.
-//     // Since `iter` is persistent, it will not return the same record twice,
-//     // even if this script is restarted.
-//     for (name, balance) in iter.take(CHUNK_SIZE) {
-//         new_map.put(&name, balance);
-//     }
-// })?;
-// // Here, the iterator has run out of items. The script can now perform
-// // other actions if necessary.
-// # Ok(())
-// # }
-// ```
-//
-// [persistent iterators]: struct.PersistentIter.html
+/// ## Using persistent iterators
+///
+/// `MigrationHelper` offers the [`Self::iter_loop()`] method, which allows to further
+/// simplify working with [persistent iterators](PersistentIter).
+///
+/// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
+/// from time to time. To do this, we use the following script:
+///
+/// ```
+/// # use matterdb::{access::AccessExt, TemporaryDB};
+/// # use matterdb::migration::{MigrationHelper, MigrationError};
+/// /// Number of accounts processed per DB merge.
+/// const CHUNK_SIZE: usize = 100;
+///
+/// let db = TemporaryDB::new();
+/// let mut helper = MigrationHelper::new(db, "test");
+/// helper.iter_loop(|helper, iters| {
+///     // The data before migration is stored in this map
+///     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
+///     // ...and the new data is in this merkelized map.
+///     let mut new_map = helper.new_data().get_map::<_, str, u64>("wallets");
+///
+///     // Create an iterator over the old data.
+///     let iter = iters.create("wallets", &old_map);
+///     // Take a fixed amount of records from the iterator and migrate them.
+///     // Since `iter` is persistent, it will not return the same record twice,
+///     // even if this script is restarted.
+///     for (name, balance) in iter.take(CHUNK_SIZE) {
+///         new_map.put(&name, balance);
+///     }
+/// })?;
+/// // Here, the iterator has run out of items. The script can now perform
+/// // other actions if necessary.
+/// # anyhow::Ok(())
+/// ```
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
     abort_handle: Box<dyn AbortMigration>,
@@ -427,9 +375,7 @@ impl MigrationHelper {
     /// Merges the changes to the migrated data and the scratchpad to the database.
     ///
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`flush_migration`] to flush the migrated data.
-    ///
-    /// [`flush_migration`]: fn.flush_migration.html
+    /// Use [`flush_migration()`] to flush the migrated data.
     ///
     /// # Errors
     ///
@@ -474,9 +420,7 @@ impl MigrationHelper {
     /// Returns hash representing migrated data state, or an error if the merge has failed.
     ///
     /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`flush_migration`] to flush the migrated data.
-    ///
-    /// [`flush_migration`]: fn.flush_migration.html
+    /// Use [`flush_migration()`] to flush the migrated data.
     ///
     /// # Errors
     ///
@@ -610,14 +554,11 @@ mod tests {
         MigrationHelper, SCRATCHPAD_NAME, Scratchpad, ViewWithMetadata, flush_migration,
         rollback_migration,
     };
-    use crate::{
-        TemporaryDB,
-        access::{AccessExt, CopyAccessExt, RawAccess},
-    };
+    use crate::{TemporaryDB, access::AccessExt};
 
     #[test]
     fn in_memory_migration() {
-        fn check_indexes<T: RawAccess + Copy>(view: T) {
+        fn check_indexes<T: AccessExt + ?Sized>(view: &T) {
             let list = view.get_list::<_, u64>("name.list");
             assert_eq!(list.len(), 2);
             assert_eq!(list.get(0), Some(4));
@@ -670,12 +611,12 @@ mod tests {
         // Merge the fork and run the checks again.
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        check_indexes(&snapshot);
+        check_indexes(snapshot.as_ref());
     }
 
     #[test]
     fn migration_with_merges() {
-        fn check_indexes<T: RawAccess + Copy>(view: T) {
+        fn check_indexes<T: AccessExt + ?Sized>(view: &T) {
             let list = view.get_list::<_, u64>("name.list");
             assert_eq!(list.len(), 4);
             assert_eq!(list.get(2), Some(6));
@@ -746,7 +687,7 @@ mod tests {
         check_indexes(&fork);
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        check_indexes(&snapshot);
+        check_indexes(snapshot.as_ref());
     }
 
     fn test_migration_rollback(with_merge: bool) {
@@ -767,6 +708,7 @@ mod tests {
         fork.rollback_migration("test");
         assert_eq!(fork.get_entry::<_, u8>("test.foo").get(), Some(1));
         let patch = fork.into_patch();
+        let patch = patch.as_ref();
         assert_eq!(patch.get_entry::<_, u8>("test.foo").get(), Some(1));
         assert_eq!(
             patch
@@ -776,7 +718,7 @@ mod tests {
             vec![1_i32, 2, 3]
         );
 
-        let migration = Migration::new("test", &patch);
+        let migration = Migration::new("test", patch);
         assert!(!migration.get_entry::<_, u8>("foo").exists());
         // Since migrated indexes don't exist, it should be OK to assign new types to them.
         assert!(!migration.get_entry::<_, ()>(("list", &1)).exists());
@@ -825,13 +767,13 @@ mod tests {
 
         // Check that info persists to `Patch`es and `Snapshot`s.
         let patch = fork.into_patch();
-        let scratchpad = Scratchpad::new("test", &patch);
+        let scratchpad = Scratchpad::new("test", patch.as_ref());
         let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
         db.merge(patch).unwrap();
         let snapshot = db.snapshot();
-        let scratchpad = Scratchpad::new("test", &snapshot);
+        let scratchpad = Scratchpad::new("test", snapshot.as_ref());
         let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
@@ -994,7 +936,7 @@ mod tests {
         let res = rig.thread_handle.join().unwrap();
         assert_matches!(res.unwrap_err(), MigrationError::Aborted);
         let snapshot = db.snapshot();
-        let migration = Migration::new("test", &snapshot);
+        let migration = Migration::new("test", snapshot.as_ref());
         assert!(!migration.get_entry::<_, u32>("entry").exists());
     }
 
@@ -1007,7 +949,7 @@ mod tests {
         let res = rig.thread_handle.join().unwrap();
         res.unwrap();
         let snapshot = db.snapshot();
-        let migration = Migration::new("test", &snapshot);
+        let migration = Migration::new("test", snapshot.as_ref());
         assert_eq!(migration.get_entry::<_, u32>("entry").get(), Some(1));
     }
 

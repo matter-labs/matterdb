@@ -13,7 +13,7 @@ use std::{
 use crate::{
     Error, Result,
     validation::assert_valid_name_component,
-    views::{AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
+    views::{ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View},
 };
 
 /// Changes related to a specific `View`.
@@ -85,21 +85,6 @@ struct WorkingPatch {
 }
 
 #[derive(Debug)]
-enum WorkingPatchRef<'a> {
-    Borrowed(&'a WorkingPatch),
-    Owned(Rc<Fork>),
-}
-
-impl WorkingPatchRef<'_> {
-    fn patch(&self) -> &WorkingPatch {
-        match self {
-            WorkingPatchRef::Borrowed(patch) => patch,
-            WorkingPatchRef::Owned(fork) => &fork.working_patch,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct ChangesRef<'a> {
     inner: Rc<ViewChanges>,
     _lifetime: PhantomData<&'a ()>,
@@ -124,7 +109,7 @@ impl Deref for ChangesRef<'_> {
 /// `RefMut`, but dumber.
 #[derive(Debug)]
 pub struct ChangesMut<'a> {
-    parent: WorkingPatchRef<'a>,
+    parent: &'a WorkingPatch,
     key: ResolvedAddress,
     changes: Option<Rc<ViewChanges>>,
 }
@@ -151,7 +136,7 @@ impl DerefMut for ChangesMut<'_> {
 
 impl Drop for ChangesMut<'_> {
     fn drop(&mut self) {
-        let mut change_map = self.parent.patch().changes.borrow_mut();
+        let mut change_map = self.parent.changes.borrow_mut();
         let changes = change_map.get_mut(&self.key).unwrap_or_else(|| {
             panic!("insertion point for changes disappeared at {:?}", self.key);
         });
@@ -162,13 +147,6 @@ impl Drop for ChangesMut<'_> {
 }
 
 impl WorkingPatch {
-    /// Creates a new empty patch.
-    fn new() -> Self {
-        Self {
-            changes: RefCell::new(HashMap::new()),
-        }
-    }
-
     /// Takes a cell with changes for a specific `View` out of the patch.
     /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
     fn take_view_changes(&self, address: &ResolvedAddress) -> ChangesCell {
@@ -183,7 +161,7 @@ impl WorkingPatch {
             })
         };
 
-        if let Some(ref view_changes) = view_changes {
+        if let Some(view_changes) = &view_changes {
             assert!(
                 Rc::strong_count(view_changes) == 1,
                 "Attempting to borrow {address:?} mutably while it's borrowed immutably"
@@ -213,7 +191,7 @@ impl WorkingPatch {
             .clone()
     }
 
-    // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
+    // TODO: verify that this method updates `Change`s already in the `Patch`
     fn merge_into(self, patch: &mut Patch) {
         for (address, changes) in self.changes.into_inner() {
             // Check that changes are not borrowed mutably (in this case, the corresponding
@@ -247,7 +225,7 @@ impl WorkingPatch {
 }
 
 /// A generalized iterator over the storage views.
-pub type Iter<'a> = Box<dyn Iterator + 'a>;
+pub type BoxedIterator<'a> = Box<dyn Iterator + 'a>;
 
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
@@ -262,22 +240,22 @@ pub(crate) enum Change {
 /// A combination of a database snapshot and changes on top of it.
 ///
 /// A `Fork` provides both immutable and mutable operations over the database by implementing
-/// the [`RawAccessMut`] trait. Like [`Snapshot`], `Fork` provides read isolation.
+/// the [`RawAccessMut`](crate::access::RawAccessMut) trait. Like [`Snapshot`], `Fork` provides read isolation.
 /// When mutable operations are applied to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
 /// To apply the changes to the database, you need to convert a `Fork` into a [`Patch`] using
-/// [`into_patch`] and then atomically [`merge`] it into the database. If two
+/// [`Self::into_patch()`] and then atomically [`merge`](Database::merge()) it into the database. If two
 /// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
 /// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports checkpoints ([`flush`] and [`rollback`] methods), which allows
-/// rolling back the latest changes. A checkpoint is created automatically after calling
+/// `Fork` also supports checkpoints ([`flush`](Self::flush()) and [`rollback`](Self::rollback()) methods),
+/// which allows rolling back the latest changes. A checkpoint is created automatically after calling
 /// the `flush` method.
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let mut fork = db.fork();
 /// fork.get_list("list").extend(vec![1_u32, 2]);
@@ -303,7 +281,7 @@ pub(crate) enum Change {
 /// For example the code below will panic at runtime.
 ///
 /// ```rust,should_panic
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB, ListIndex, Database};
+/// # use matterdb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let index = fork.get_list::<_, u8>("index");
@@ -311,10 +289,10 @@ pub(crate) enum Change {
 /// let index2 = fork.get_list::<_, u8>("index");
 /// ```
 ///
-/// To enable immutable / shared references to indexes, you may use [`readonly`] method:
+/// To enable immutable / shared references to indexes, you may use [`readonly()`](Self::readonly()) method:
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, TemporaryDB, ListIndex, Database};
+/// # use matterdb::{access::AccessExt, TemporaryDB, ListIndex, Database};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list::<_, u8>("index").extend(vec![1, 2, 3]);
@@ -331,17 +309,6 @@ pub(crate) enum Change {
 /// Shared references work like `RefCell::borrow()`; it is a runtime error to try to obtain
 /// a shared reference to an index if there is an exclusive reference to the same index,
 /// and vice versa.
-///
-/// [`RawAccessMut`]: access/trait.RawAccessMut.html
-/// [`Snapshot`]: trait.Snapshot.html
-/// [`Patch`]: struct.Patch.html
-/// [`into_patch`]: #method.into_patch
-/// [`merge`]: trait.Database.html#tymethod.merge
-/// [`commit`]: #method.commit
-/// [`flush`]: #method.flush
-/// [`rollback`]: #method.rollback
-/// [`readonly`]: #method.readonly
-/// [`RefCell::borrow_mut()`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html#method.borrow_mut
 #[derive(Debug)]
 pub struct Fork {
     patch: Patch,
@@ -357,14 +324,14 @@ pub struct Fork {
 ///
 /// ```
 /// # use matterdb::{
-/// #     access::CopyAccessExt, Database, Patch, TemporaryDB,
+/// #     access::AccessExt, Database, Patch, TemporaryDB,
 /// # };
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list("list").extend(vec![1_i32, 2, 3]);
 /// let patch: Patch = fork.into_patch();
 /// // The patch contains changes recorded in the fork.
-/// let list = patch.get_list::<_, i32>("list");
+/// let list = patch.as_ref().get_list::<_, i32>("list");
 /// assert_eq!(list.len(), 3);
 /// ```
 #[derive(Debug)]
@@ -373,8 +340,14 @@ pub struct Patch {
     changes: HashMap<ResolvedAddress, ViewChanges>,
 }
 
+impl AsRef<dyn Snapshot> for Patch {
+    fn as_ref(&self) -> &dyn Snapshot {
+        self
+    }
+}
+
 pub(super) struct ForkIter<'a, T: StdIterator> {
-    snapshot: Iter<'a>,
+    snapshot: BoxedIterator<'a>,
     changes: Option<Peekable<T>>,
 }
 
@@ -393,8 +366,8 @@ enum NextIterValue {
 ///
 /// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
-/// There is no way to directly interact with data in the database; use [`snapshot`], [`fork`]
-/// and [`merge`] methods for indirect interaction. See [the crate-level documentation](index.html)
+/// There is no way to directly interact with data in the database; use [`Self::snapshot()`], [`Self::fork()`]
+/// and [`Self::merge()`] for indirect interaction. See [the crate-level documentation](crate)
 /// for more details.
 ///
 /// Note that `Database` effectively has [interior mutability][interior-mut];
@@ -402,7 +375,7 @@ enum NextIterValue {
 /// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
 /// ```
-/// use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// use matterdb::{access::AccessExt, Database, TemporaryDB};
 ///
 /// // not declared as `mut db`!
 /// let db: Box<dyn Database> = Box::new(TemporaryDB::new());
@@ -451,7 +424,7 @@ enum NextIterValue {
 ///
 /// ```
 /// // NEVER USE THIS PATTERN!
-/// # use matterdb::{access::CopyAccessExt, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let first_fork = db.fork();
 /// first_fork.get_list("list").extend(vec![1, 2, 3]);
@@ -471,9 +444,6 @@ enum NextIterValue {
 /// workflow should only be used for minor changes, for which the proof that a patch does not overlap
 /// with concurrent patches is tractable.
 ///
-/// [`snapshot`]: #tymethod.snapshot
-/// [`fork`]: #method.fork
-/// [`merge`]: #tymethod.merge
 /// [interior-mut]: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
@@ -486,7 +456,7 @@ pub trait Database: Send + Sync + 'static {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
             },
-            working_patch: WorkingPatch::new(),
+            working_patch: WorkingPatch::default(),
         }
     }
 
@@ -525,10 +495,7 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error, the method guarantees no changes are applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
-}
 
-/// Extension trait for `Database`.
-pub trait DatabaseExt: Database {
     /// Merges a patch into the database and creates a backup patch that reverses all the merged
     /// changes.
     ///
@@ -542,7 +509,7 @@ pub trait DatabaseExt: Database {
     /// and then applying backups in the reverse order:
     ///
     /// ```
-    /// # use matterdb::{access::{Access, CopyAccessExt}, Database, DatabaseExt, TemporaryDB};
+    /// # use matterdb::{access::{Access, AccessExt}, Database, TemporaryDB};
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
     /// fork.get_list("list").push(1_u32);
@@ -558,16 +525,16 @@ pub trait DatabaseExt: Database {
     ///     view.get_list("list").iter().collect()
     /// }
     ///
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2, 3, 4]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1, 2, 3, 4]);
     /// // Rollback the most recent merge.
     /// db.merge(backup3).unwrap();
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1, 2]);
     /// // ...Then the penultimate merge.
     /// db.merge(backup2).unwrap();
-    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1]);
+    /// assert_eq!(enumerate_list(db.snapshot().as_ref()), vec![1]);
     /// // ...Then the oldest one.
     /// db.merge(backup1).unwrap();
-    /// assert!(enumerate_list(&db.snapshot()).is_empty());
+    /// assert!(enumerate_list(db.snapshot().as_ref()).is_empty());
     /// ```
     ///
     /// # Performance notes
@@ -614,8 +581,6 @@ pub trait DatabaseExt: Database {
     }
 }
 
-impl<T: Database> DatabaseExt for T {}
-
 /// A read-only snapshot of a storage backend.
 ///
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
@@ -636,11 +601,11 @@ pub trait Snapshot: Send + Sync + 'static {
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
     #[allow(clippy::iter_not_returning_iterator)]
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> BoxedIterator<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
-/// the standard [`Iterator`](https://doc.rust-lang.org/std/iter/trait.Iterator.html)
+/// the standard [`Iterator`](std::iter::Iterator)
 /// trait, `Iterator` in `MatterDB` is low-level and, therefore, operates with bytes.
 pub trait Iterator {
     /// Advances the iterator and returns a reference to the next key and value.
@@ -674,7 +639,7 @@ impl Snapshot for Patch {
             .unwrap_or_else(|()| self.snapshot.contains(name, key))
     }
 
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> BoxedIterator<'_> {
         let maybe_changes = self.changes.get(name);
         let changes_iter = maybe_changes.map(|changes| {
             changes
@@ -692,30 +657,12 @@ impl Snapshot for Patch {
     }
 }
 
-impl RawAccess for &'_ Patch {
-    type Changes = ();
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        *self as &dyn Snapshot
-    }
-
-    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
-}
-
-impl AsReadonly for &'_ Patch {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        self
-    }
-}
-
 impl Fork {
     /// Finalizes all changes that were made after previous execution of the `flush` method.
     /// If no `flush` method had been called before, finalizes all changes that were
     /// made after creation of `Fork`.
     pub fn flush(&mut self) {
-        let working_patch = mem::replace(&mut self.working_patch, WorkingPatch::new());
+        let working_patch = mem::take(&mut self.working_patch);
         working_patch.merge_into(&mut self.patch);
     }
 
@@ -735,7 +682,7 @@ impl Fork {
     /// Rolls back all changes that were made after the latest execution
     /// of the `flush` method.
     pub fn rollback(&mut self) {
-        self.working_patch = WorkingPatch::new();
+        self.working_patch = WorkingPatch::default();
     }
 
     /// Rolls back the migration with the specified name. This will remove all indexes
@@ -763,20 +710,6 @@ impl Fork {
     }
 }
 
-impl From<Patch> for Fork {
-    /// Creates a fork based on the provided `patch` and `snapshot`.
-    ///
-    /// Note: using created fork to modify data already present in `patch` may lead
-    /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indexes.
-    fn from(patch: Patch) -> Self {
-        Self {
-            patch,
-            working_patch: WorkingPatch::new(),
-        }
-    }
-}
-
 impl<'a> RawAccess for &'a Fork {
     type Changes = ChangesMut<'a>;
 
@@ -789,24 +722,7 @@ impl<'a> RawAccess for &'a Fork {
         ChangesMut {
             changes,
             key: address.clone(),
-            parent: WorkingPatchRef::Borrowed(&self.working_patch),
-        }
-    }
-}
-
-impl RawAccess for Rc<Fork> {
-    type Changes = ChangesMut<'static>;
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        &self.patch
-    }
-
-    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
-        let changes = self.working_patch.take_view_changes(address);
-        ChangesMut {
-            changes,
-            key: address.clone(),
-            parent: WorkingPatchRef::Owned(Self::clone(self)),
+            parent: &self.working_patch,
         }
     }
 }
@@ -827,7 +743,7 @@ impl RawAccess for Rc<Fork> {
 /// # Examples
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, ReadonlyFork, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_list("list").push(1_u32);
@@ -845,7 +761,7 @@ impl RawAccess for Rc<Fork> {
 /// There are no write methods in indexes instantiated from `ReadonlyFork`:
 ///
 /// ```compile_fail
-/// # use matterdb::{access::CopyAccessExt, Database, ReadonlyFork, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, ReadonlyFork, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let readonly: ReadonlyFork<'_> = fork.readonly();
@@ -854,22 +770,6 @@ impl RawAccess for Rc<Fork> {
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
-
-impl AsReadonly for ReadonlyFork<'_> {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        *self
-    }
-}
-
-impl<'a> AsReadonly for &'a Fork {
-    type Readonly = ReadonlyFork<'a>;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        ReadonlyFork(self)
-    }
-}
 
 impl<'a> RawAccess for ReadonlyFork<'a> {
     type Changes = ChangesRef<'a>;
@@ -886,86 +786,11 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
     }
 }
 
-/// Version of `ReadonlyFork` with a static lifetime. Can be produced from an `Rc<Fork>` using
-/// the `AsReadonly` trait.
-///
-/// Beware that producing an instance increases the reference counter of the underlying fork.
-/// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
-/// `OwnedReadonlyFork` instances are dropped by this time.
-///
-/// [`Rc::try_unwrap`]: https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap
-///
-/// # Examples
-///
-/// ```
-/// # use matterdb::{access::AccessExt, AsReadonly, Database, OwnedReadonlyFork, TemporaryDB};
-/// # use std::rc::Rc;
-/// let db = TemporaryDB::new();
-/// let fork = Rc::new(db.fork());
-/// fork.get_list("list").extend(vec![1_u32, 2, 3]);
-/// let ro_fork: OwnedReadonlyFork = fork.as_readonly();
-/// let list = ro_fork.get_list::<_, u32>("list");
-/// assert_eq!(list.len(), 3);
-/// ```
-#[derive(Debug, Clone)]
-pub struct OwnedReadonlyFork(Rc<Fork>);
-
-impl RawAccess for OwnedReadonlyFork {
-    type Changes = ChangesRef<'static>;
-
-    fn snapshot(&self) -> &dyn Snapshot {
-        &self.0.patch
-    }
-
-    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
-        ChangesRef {
-            inner: self.0.working_patch.clone_view_changes(address),
-            _lifetime: PhantomData,
-        }
-    }
-}
-
-impl AsReadonly for OwnedReadonlyFork {
-    type Readonly = Self;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        self.clone()
-    }
-}
-
-impl AsReadonly for Rc<Fork> {
-    type Readonly = OwnedReadonlyFork;
-
-    fn as_readonly(&self) -> Self::Readonly {
-        OwnedReadonlyFork(self.clone())
-    }
-}
-
-impl AsRef<dyn Snapshot> for dyn Snapshot {
-    fn as_ref(&self) -> &dyn Snapshot {
-        self
-    }
-}
-
-impl Snapshot for Box<dyn Snapshot> {
-    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        self.as_ref().get(name, key)
-    }
-
-    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
-        self.as_ref().contains(name, key)
-    }
-
-    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
-        self.as_ref().iter(name, from)
-    }
-}
-
 impl<'a, T> ForkIter<'a, T>
 where
     T: StdIterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
-    pub(crate) fn new(snapshot: Iter<'a>, changes: Option<T>) -> Self {
+    pub(crate) fn new(snapshot: BoxedIterator<'a>, changes: Option<T>) -> Self {
         ForkIter {
             snapshot,
             changes: changes.map(StdIterator::peekable),
@@ -1130,11 +955,8 @@ pub(crate) fn check_database(db: &mut dyn Database) -> Result<()> {
 mod tests {
     use std::collections::HashSet;
 
-    use super::{
-        AsReadonly, Change, Database, DatabaseExt, Fork, OwnedReadonlyFork, Patch, Rc,
-        ResolvedAddress, Snapshot, StdIterator, View,
-    };
-    use crate::{TemporaryDB, access::CopyAccessExt};
+    use super::*;
+    use crate::{TemporaryDB, access::AccessExt};
 
     #[test]
     fn readonly_indexes_are_timely_dropped() {
@@ -1311,36 +1133,9 @@ mod tests {
         let fork = db.fork();
         fork.get_entry(("foo", &1_u8)).set(2_u32);
         let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        let backup = backup.as_ref();
         assert!(backup.index_type(("foo", &1_u8)).is_none());
         assert!(backup.get_list::<_, u32>(("foo", &1_u8)).is_empty());
-    }
-
-    #[test]
-    fn borrows_from_owned_forks() {
-        use crate::{Entry, access::AccessExt};
-
-        let db = TemporaryDB::new();
-        let fork = Rc::new(db.fork());
-        let readonly: OwnedReadonlyFork = fork.as_readonly();
-        // Modify an index via `fork`.
-        fork.get_list("list").extend(vec![1_i64, 2, 3]);
-        // Check that if both `CopyAccessExt` and `AccessExt` traits are in scope, the correct one
-        // is used for `Rc<Fork>`.
-        let mut entry: Entry<Rc<Fork>, _> = fork.get_entry("entry");
-        // Access the list via `readonly`.
-        let list = readonly.get_list::<_, i64>("list");
-        assert_eq!(list.len(), 3);
-        assert_eq!(list.get(1), Some(2));
-        assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![2, 3]);
-
-        entry.set("!".to_owned());
-        drop(entry);
-        let entry = readonly.get_entry::<_, String>("entry");
-        // Clone `readonly` access and get another `entry` instance.
-        let other_readonly = readonly;
-        let other_entry = other_readonly.get_entry::<_, String>("entry");
-        assert_eq!(entry.get().unwrap(), "!");
-        assert_eq!(other_entry.get().unwrap(), "!");
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     BinaryKey,
     access::{Access, AccessError, FromAccess},
-    views::{AsReadonly, GroupKeys, IndexAddress},
+    views::{GroupKeys, IndexAddress},
 };
 
 // cspell:ignore foob
@@ -21,7 +21,7 @@ use crate::{
 ///
 /// ```
 /// # use matterdb::{
-/// #     access::{Access, CopyAccessExt, FromAccess},
+/// #     access::{Access, AccessExt, FromAccess},
 /// #     Database, Group, ListIndex, TemporaryDB,
 /// # };
 /// type StrGroup<T> = Group<T, str, ListIndex<<T as Access>::Base, u64>>;
@@ -42,7 +42,7 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use matterdb::{access::{CopyAccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
+/// # use matterdb::{access::{AccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let group: Group<_, u64, ListIndex<_, u64>> = fork.get_group("group");
@@ -60,7 +60,7 @@ use crate::{
 /// Group keys can be unsized:
 ///
 /// ```
-/// # use matterdb::{access::CopyAccessExt, Database, Group, ListIndex, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
 /// # let db = TemporaryDB::new();
 /// # let fork = db.fork();
 /// let group: Group<_, str, ListIndex<_, u64>> = fork.get_group("unsized_group");
@@ -112,26 +112,20 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: Access,
-    T::Base: AsReadonly<Readonly = T::Base>,
     K: BinaryKey + ?Sized,
 {
     /// Iterator over keys in this group.
     ///
     /// The iterator buffers keys in memory and may become inconsistent. Although
-    /// the Rust type system prevents iterating over keys in a group based on [`Fork`],
-    /// it it still possible to make the iterator return inconsistent results. Indeed,
-    /// for a group is based on [`ReadonlyFork`], it is possible to add new indexes via `Fork`
+    /// the Rust type system prevents iterating over keys in a group based on [`Fork`](crate::Fork),
+    /// it is still possible to make the iterator return inconsistent results. Indeed,
+    /// for a group is based on [`ReadonlyFork`](crate::ReadonlyFork), it is possible to add new indexes via `Fork`
     /// while the iteration is in progress.
     ///
     /// For this reason, it is advised to use this method for groups based on `ReadonlyFork`
     /// only in the case where stale reads are tolerated or are prevented on the application level.
-    /// Groups based on [`Snapshot`] implementations (including [`Patch`]es) are not affected
+    /// Groups based on [`Snapshot`](crate::Snapshot) implementations (including [`Patch`](crate::Patch)es) are not affected
     /// by this issue.
-    ///
-    /// [`Fork`]: ../struct.Fork.html
-    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
-    /// [`Snapshot`]: ../trait.Snapshot.html
-    /// [`Patch`]: ../struct.Patch.html
     pub fn keys(&self) -> GroupKeys<T::Base, K> {
         self.access.clone().group_keys(self.prefix.clone())
     }
@@ -139,10 +133,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Access, AsReadonly, BinaryKey, FromAccess, Group};
+    use super::*;
     use crate::{
         Database, ListIndex, TemporaryDB,
-        access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
+        access::{AccessExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},
     };
 
@@ -178,10 +172,10 @@ mod tests {
         // group.get(&3).push("quux".to_owned());
     }
 
-    fn prepare_key_iter<A>(fork: &A)
+    fn prepare_key_iter<'a, A>(fork: &'a A)
     where
-        A: Access,
-        A::Base: RawAccessMut,
+        A: AccessExt + ?Sized,
+        <A::Ref<'a> as Access>::Base: RawAccessMut,
     {
         let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
         group.get("foo").push("foo".to_owned());
@@ -189,7 +183,7 @@ mod tests {
         group.get("baz").push("baz".to_owned());
 
         let group: Group<_, u32, ListIndex<_, String>> =
-            Group::from_access(fork.clone(), ("prefixed", &0_u8).into()).unwrap();
+            Group::from_access(fork.get_ref(), ("prefixed", &0_u8).into()).unwrap();
         group.get(&1).push("foo".to_owned());
         group.get(&2).push("bar".to_owned());
         group.get(&5).push("baz".to_owned());
@@ -208,10 +202,9 @@ mod tests {
         fork.get_entry("unrelated").set(23);
     }
 
-    fn test_key_iter<A>(snapshot: A)
+    fn test_key_iter<A>(snapshot: &A)
     where
-        A: Access,
-        A::Base: AsReadonly<Readonly = A::Base>,
+        A: AccessExt + ?Sized,
     {
         let group: Group<_, str, ListIndex<_, String>> = snapshot.get_group("group");
         assert_eq!(
@@ -220,7 +213,7 @@ mod tests {
         );
 
         let group: Group<_, u32, ListIndex<_, String>> =
-            Group::from_access(snapshot, ("prefixed", &0_u8).into()).unwrap();
+            Group::from_access(snapshot.get_ref(), ("prefixed", &0_u8).into()).unwrap();
         assert_eq!(group.keys().collect::<Vec<_>>(), vec![1, 2, 5, 100_000]);
     }
 
@@ -228,10 +221,10 @@ mod tests {
     fn iterating_over_keys() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(&&fork);
-        test_key_iter(fork.readonly());
+        prepare_key_iter(&fork);
+        test_key_iter(&fork.readonly());
         let patch = fork.into_patch();
-        test_key_iter(&patch);
+        test_key_iter(patch.as_ref());
     }
 
     #[test]
@@ -239,11 +232,11 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Prefixed::new("namespace", &fork));
-        test_key_iter(Prefixed::new("namespace", fork.readonly()));
+        test_key_iter(&Prefixed::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Prefixed::new("namespace", &patch));
+        test_key_iter(&Prefixed::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Prefixed::new("namespace", &db.snapshot()));
+        test_key_iter(&Prefixed::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -251,11 +244,11 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Migration::new("namespace", &fork));
-        test_key_iter(Migration::new("namespace", fork.readonly()));
+        test_key_iter(&Migration::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Migration::new("namespace", &patch));
+        test_key_iter(&Migration::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Migration::new("namespace", &db.snapshot()));
+        test_key_iter(&Migration::new("namespace", db.snapshot().as_ref()));
     }
 
     #[test]
@@ -263,10 +256,10 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         prepare_key_iter(&Scratchpad::new("namespace", &fork));
-        test_key_iter(Scratchpad::new("namespace", fork.readonly()));
+        test_key_iter(&Scratchpad::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
-        test_key_iter(Scratchpad::new("namespace", &patch));
+        test_key_iter(&Scratchpad::new("namespace", patch.as_ref()));
         db.merge(patch).unwrap();
-        test_key_iter(Scratchpad::new("namespace", &db.snapshot()));
+        test_key_iter(&Scratchpad::new("namespace", db.snapshot().as_ref()));
     }
 }

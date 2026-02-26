@@ -1,4 +1,4 @@
-use matterdb::{DBOptions, Database, RocksDB, access::CopyAccessExt};
+use matterdb::{DBOptions, Database, RocksDB, access::AccessExt};
 use tempfile::TempDir;
 
 #[test]
@@ -10,7 +10,7 @@ fn checkpoints() {
     let dst_path = dst_temp_dir.path().join("dst");
 
     // Convert into `dyn Database` to test downcast.
-    let db = RocksDB::open(&*src_path, &DBOptions::default()).unwrap();
+    let db = RocksDB::open(&src_path, &DBOptions::default()).unwrap();
 
     // Write some data to the source database.
     {
@@ -21,7 +21,7 @@ fn checkpoints() {
 
     // Create checkpoint
     {
-        db.create_checkpoint(&*dst_path).unwrap();
+        db.create_checkpoint(&dst_path).unwrap();
     }
 
     // Add more data to the source database
@@ -37,7 +37,7 @@ fn checkpoints() {
     // Open checkpoint and Assert that it's not affected
     // by the data added after create_checkpoint call.
     {
-        let checkpoint = RocksDB::open(&*dst_path, &DBOptions::default()).unwrap();
+        let checkpoint = RocksDB::open(&dst_path, &DBOptions::default()).unwrap();
         let fork = checkpoint.fork();
 
         assert_eq!(fork.get_entry("first").get(), Some(vec![1_u8; 1024]));
@@ -50,7 +50,7 @@ fn checkpoints() {
 
     // Assert that source database is not affected by the data added to checkpoint.
     {
-        let db = RocksDB::open(&*src_path, &DBOptions::default()).unwrap();
+        let db = RocksDB::open(&src_path, &DBOptions::default()).unwrap();
         let fork = db.fork();
 
         assert_eq!(fork.get_entry("first").get(), Some(vec![1_u8; 1024]));
@@ -63,7 +63,7 @@ fn checkpoints() {
 
     // Assert that checkpoint is not affected if source database is deleted.
     {
-        let checkpoint = RocksDB::open(&*dst_path, &DBOptions::default()).unwrap();
+        let checkpoint = RocksDB::open(&dst_path, &DBOptions::default()).unwrap();
         let fork = checkpoint.fork();
 
         assert_eq!(fork.get_entry("first").get(), Some(vec![1_u8; 1024]));

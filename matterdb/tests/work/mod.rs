@@ -20,15 +20,15 @@ pub(crate) const INDEX_NAMES: &[&str] = &[
 ];
 
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn work_on_index<T>(
-    fork: T,
+pub(crate) fn work_on_index<'a, T>(
+    fork: &'a T,
     addr: IndexAddress,
     mut index_type: IndexType,
     value: Option<Vec<u8>>,
 ) -> IndexType
 where
-    T: Access,
-    T::Base: RawAccessMut,
+    T: AccessExt,
+    T::Ref<'a>: Access<Base: RawAccessMut>,
 {
     if let Some(real_type) = fork.index_type(addr.clone()) {
         index_type = real_type;
@@ -101,10 +101,9 @@ pub(crate) struct IndexData {
 }
 
 impl IndexData {
-    #[allow(clippy::needless_pass_by_value)] // FIXME
-    pub(crate) fn check<S>(&self, snapshot: S, addr: IndexAddress) -> TestCaseResult
+    pub(crate) fn check<S>(&self, snapshot: &S, addr: IndexAddress) -> TestCaseResult
     where
-        S: Access,
+        S: AccessExt + ?Sized,
     {
         match self.ty {
             IndexType::Entry => {

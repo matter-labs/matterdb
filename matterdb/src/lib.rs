@@ -14,16 +14,16 @@
 //!
 //! Snapshots and forks facilitate access to the database.
 //!
-//! If you need to read the data, you can create a [`Snapshot`] using the [`snapshot`][1] method
+//! If you need to read the data, you can create a [`Snapshot`] using the [`snapshot()`][Database::snapshot()] method
 //! of the `Database` instance. Snapshots provide read isolation, so you are guaranteed to work
 //! with consistent values even if the data in the database changes between reads. `Snapshot`
 //! provides all the necessary methods for reading data from the database, so `&Snapshot`
 //! is used as a storage view for creating a read-only representation of the [indexes](#indexes).
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
-//! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
+//! the [`fork()`][Database::fork()] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
 //! but also allows creating a sequence of changes to the database that are specified
-//! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
+//! as a [`Patch`]. A patch can be atomically [`merge`](Database::merge())d into a database. Different threads
 //! may call `merge` concurrently.
 //!
 //! # `BinaryKey` and `BinaryValue` traits
@@ -50,41 +50,14 @@
 //! - [`ListIndex`] is a list of items stored in a sequential order. Similar to [`Vec`].
 //! - [`SparseListIndex`] is a list of items stored in a sequential order. Similar to `ListIndex`,
 //!   but may contain indexes without elements.
-//! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
-//! - [`KeySetIndex`] and [`ValueSetIndex`] are sets of items, similar to [`BTreeSet`] and
-//!   [`HashSet`] accordingly.
+//! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`](std::collections::BTreeMap).
+//! - [`KeySetIndex`] is a set of items, similar to [`BTreeSet`](std::collections::BTreeSet).
 //!
 //! # Migrations
 //!
-//! The database [provides tooling](migration/index.html) for data migrations. With the help
+//! The database [provides tooling](migration) for data migrations. With the help
 //! of migration, it is possible to gradually accumulate changes to a set of indexes (including
 //! across process restarts) and then atomically apply or discard these changes.
-//!
-//! [`Database`]: trait.Database.html
-//! [`RocksDB`]: struct.RocksDB.html
-//! [`TemporaryDB`]: struct.TemporaryDB.html
-//! [`Snapshot`]: trait.Snapshot.html
-//! [`Fork`]: struct.Fork.html
-//! [`Patch`]: struct.Patch.html
-//! [1]: trait.Database.html#tymethod.snapshot
-//! [2]: trait.Database.html#method.fork
-//! [`merge`]: trait.Database.html#tymethod.merge
-//! [`BinaryKey`]: trait.BinaryKey.html
-//! [`BinaryValue`]: trait.BinaryValue.html
-//! [`Entry`]: indexes/struct.Entry.html
-//! [`ListIndex`]: indexes/struct.ListIndex.html
-//! [`SparseListIndex`]: indexes/struct.SparseListIndex.html
-//! [`MapIndex`]: indexes/struct.MapIndex.html
-//! [`KeySetIndex`]: indexes/struct.KeySetIndex.html
-//! [`ValueSetIndex`]: indexes/struct.ValueSetIndex.html
-//! [`ObjectHash`]: trait.ObjectHash.html
-//! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
-//! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
-//! [`Vec`]: https://doc.rust-lang.org/std/vec/struct.Vec.html
-//! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
-//! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
-//! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
-//! [`Group`]: indexes/group/struct.Group.html
 
 // Re-exports for use in the derive macros.
 #[doc(hidden)]
@@ -101,16 +74,12 @@ pub use self::{
         rocksdb::{self, RocksDB},
         temporarydb::TemporaryDB,
     },
-    db::{
-        Database, DatabaseExt, Fork, Iter, Iterator, OwnedReadonlyFork, Patch, ReadonlyFork,
-        Snapshot,
-    },
+    db::{BoxedIterator, Database, Fork, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     keys::BinaryKey,
-    lazy::Lazy,
     options::DBOptions,
     values::BinaryValue,
-    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress},
+    views::{IndexAddress, IndexType, ResolvedAddress},
 };
 
 #[macro_use]
@@ -119,10 +88,8 @@ pub mod access;
 mod backends;
 mod db;
 mod error;
-pub mod generic;
 pub mod indexes;
 mod keys;
-mod lazy;
 pub mod migration;
 mod options;
 pub mod validation;

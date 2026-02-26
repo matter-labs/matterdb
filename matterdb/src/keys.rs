@@ -1,15 +1,12 @@
 //! A definition of `BinaryKey` trait and implementations for common types.
 
-use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, TimeZone, Utc};
-use rust_decimal::Decimal;
-use uuid::Uuid;
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in the serialized form, the big-endian encoding should be used
 /// with unsigned integer types. Note, however, that the big-endian encoding
-/// will not sort signed integer types in the natural order; therefore, they are
+/// will not sort *signed* integer types in the natural order; therefore, they are
 /// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///
 /// # Examples
@@ -60,11 +57,9 @@ pub trait BinaryKey: ToOwned {
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key returned via `size()`. Returns number of written bytes.
     /// The provided buffer may be uninitialized; an implementor must not read from it.
-    // TODO: Should be unsafe? (ECR-174)
     fn write(&self, buffer: &mut [u8]) -> usize;
 
     /// Deserializes the key from the specified buffer of bytes.
-    // TODO: Should be unsafe? (ECR-174)
     fn read(buffer: &[u8]) -> Self::Owned;
 }
 
@@ -118,7 +113,7 @@ impl BinaryKey for i8 {
 // spell-checker:ignore utype, itype, vals, ints
 
 macro_rules! storage_key_for_ints {
-    ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {
+    ($utype:ident, $itype:ident, $size:expr) => {
         /// Uses big-endian encoding.
         impl BinaryKey for $utype {
             fn size(&self) -> usize {
@@ -126,12 +121,13 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, *self);
+                buffer.copy_from_slice(&self.to_be_bytes());
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer)
+                let buffer = buffer.try_into().expect("unexpected buffer size");
+                Self::from_be_bytes(buffer)
             }
         }
 
@@ -144,21 +140,23 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, self.wrapping_add(Self::MIN) as $utype);
+                let unsigned_value = self.wrapping_add(Self::MIN) as $utype;
+                buffer.copy_from_slice(&unsigned_value.to_be_bytes());
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer).wrapping_sub(Self::MIN as $utype) as Self
+                let buffer = buffer.try_into().expect("unexpected buffer size");
+                $utype::from_be_bytes(buffer).wrapping_sub(Self::MIN as $utype) as Self
             }
         }
     };
 }
 
-storage_key_for_ints! {u16, i16, 2, read_u16, write_u16}
-storage_key_for_ints! {u32, i32, 4, read_u32, write_u32}
-storage_key_for_ints! {u64, i64, 8, read_u64, write_u64}
-storage_key_for_ints! {u128, i128, 16, read_u128, write_u128}
+storage_key_for_ints! {u16, i16, 2}
+storage_key_for_ints! {u32, i32, 4}
+storage_key_for_ints! {u64, i64, 8}
+storage_key_for_ints! {u128, i128, 16}
 
 impl BinaryKey for Vec<u8> {
     fn size(&self) -> usize {
@@ -267,46 +265,14 @@ impl BinaryKey for DateTime<Utc> {
     }
 }
 
-impl BinaryKey for Uuid {
-    fn size(&self) -> usize {
-        16
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(self.as_bytes());
-        self.size()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        Self::from_slice(buffer).unwrap()
-    }
-}
-
-impl BinaryKey for Decimal {
-    fn size(&self) -> usize {
-        16
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer.copy_from_slice(&self.serialize());
-        self.size()
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let mut bytes = [0_u8; 16];
-        bytes.copy_from_slice(buffer);
-        Self::deserialize(bytes)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, str::FromStr};
+    use std::fmt;
 
-    use chrono::{Duration, TimeZone};
+    use chrono::Duration;
 
-    use super::{BinaryKey, DateTime, Decimal, Utc, Uuid};
-    use crate::access::CopyAccessExt;
+    use super::*;
+    use crate::access::AccessExt;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -535,34 +501,10 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_uuid_round_trip() {
-        let uuids = [
-            Uuid::nil(),
-            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-        ];
-
-        assert_round_trip_eq(&uuids);
-    }
-
-    #[test]
-    fn test_decimal_round_trip() {
-        let decimals = [
-            Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
-            Decimal::new(9_497_628_354_687_268, 12),
-            Decimal::from_str("0").unwrap(),
-            Decimal::from_str("-0.000000000000000000019").unwrap(),
-        ];
-
-        assert_round_trip_eq(&decimals);
-    }
-
     fn assert_round_trip_eq<T>(values: &[T])
     where
-        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + Debug,
-        <T as ToOwned>::Owned: Debug,
+        T: BinaryKey + PartialEq<<T as ToOwned>::Owned> + fmt::Debug,
+        <T as ToOwned>::Owned: fmt::Debug,
     {
         for original_value in values {
             let mut buffer = get_buffer(original_value);

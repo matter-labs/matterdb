@@ -17,8 +17,6 @@ use crate::{
 ///
 /// `KeySetIndex` implements a set that stores the elements as keys with empty values.
 /// `KeySetIndex` requires that elements should implement the [`BinaryKey`] trait.
-///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T: RawAccess, K: ?Sized> {
     base: View<T>,
@@ -54,7 +52,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -73,7 +71,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -92,7 +90,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -117,7 +115,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -135,7 +133,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -161,7 +159,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -207,7 +205,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::KeySetIndex;
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const INDEX_NAME: &str = "test_index_name";
 

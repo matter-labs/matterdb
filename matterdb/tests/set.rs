@@ -2,7 +2,7 @@
 
 //! Property testing for key set index and value set index as a rust collection.
 
-use std::{collections::HashSet, hash::Hash, rc::Rc};
+use std::{collections::HashSet, hash::Hash};
 
 use matterdb::{Fork, KeySetIndex, TemporaryDB, access::AccessExt};
 use modifier::Modifier;
@@ -61,8 +61,8 @@ where
     }
 }
 
-impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
-    fn modify(self, set: &mut KeySetIndex<Rc<Fork>, u8>) {
+impl Modifier<KeySetIndex<&Fork, u8>> for SetAction<u8> {
+    fn modify(self, set: &mut KeySetIndex<&Fork, u8>) {
         match self {
             SetAction::Put(k) => {
                 set.insert(&k);
@@ -78,17 +78,21 @@ impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
     }
 }
 
-impl FromFork for KeySetIndex<Rc<Fork>, u8> {
-    fn from_fork(fork: Rc<Fork>) -> Self {
+struct KeySetTest;
+
+impl FromFork for KeySetTest {
+    type Index<'a> = KeySetIndex<&'a Fork, u8>;
+
+    fn from_fork(fork: &Fork) -> Self::Index<'_> {
         fork.get_key_set("test")
     }
 
-    fn clear(&mut self) {
-        self.clear();
+    fn clear(index: &mut Self::Index<'_>) {
+        index.clear();
     }
 }
 
-fn compare_key_set(set: &KeySetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> TestCaseResult {
+fn compare_key_set(set: &KeySetIndex<&Fork, u8>, ref_set: &HashSet<u8>) -> TestCaseResult {
     for k in ref_set {
         prop_assert!(set.contains(k));
     }
@@ -102,6 +106,6 @@ fn compare_key_set(set: &KeySetIndex<Rc<Fork>, u8>, ref_set: &HashSet<u8>) -> Te
 fn compare_key_set_to_hash_set() {
     let db = TemporaryDB::new();
     proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        compare_collections(&db, actions, compare_key_set)?;
+        compare_collections::<KeySetTest, _, _>(&db, actions, compare_key_set)?;
     });
 }

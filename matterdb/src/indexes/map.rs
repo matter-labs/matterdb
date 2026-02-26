@@ -17,9 +17,6 @@ use crate::{
 ///
 /// `MapIndex` requires that keys implement the [`BinaryKey`] trait and values implement
 /// the [`BinaryValue`] trait.
-///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
@@ -59,7 +56,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -78,7 +75,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -97,7 +94,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -116,7 +113,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -135,7 +132,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -155,7 +152,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -175,7 +172,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -195,7 +192,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -220,7 +217,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -238,7 +235,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -268,7 +265,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use matterdb::{access::CopyAccessExt, TemporaryDB, Database, MapIndex};
+    /// use matterdb::{access::AccessExt, TemporaryDB, Database, MapIndex};
     ///
     /// let db = TemporaryDB::default();
     /// let fork = db.fork();
@@ -315,7 +312,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const IDX_NAME: &str = "idx_name";
 

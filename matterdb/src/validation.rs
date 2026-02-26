@@ -12,9 +12,7 @@ pub fn is_valid_identifier(name: &str) -> bool {
 
 /// Validates that a `prefix` consists of chars allowed for an index prefix.
 ///
-/// Unlike [full names], prefixes are not allowed to contain a dot char `'.'`.
-///
-/// [full names]: fn.is_valid_identifier.html
+/// Unlike [full names](is_valid_identifier()), prefixes are not allowed to contain a dot char `'.'`.
 pub fn is_valid_index_name_component(prefix: &str) -> bool {
     prefix
         .as_bytes()

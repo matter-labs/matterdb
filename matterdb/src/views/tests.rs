@@ -1,11 +1,11 @@
-use std::{num::NonZeroU64, panic, rc::Rc};
+use std::{num::NonZeroU64, panic};
 
 use assert_matches::assert_matches;
 use url::form_urlencoded::byte_serialize;
 
 use crate::{
     DBOptions, Database, Fork, ListIndex, MapIndex, ResolvedAddress, RocksDB, TemporaryDB,
-    access::CopyAccessExt,
+    access::AccessExt,
     db,
     validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
@@ -156,8 +156,8 @@ fn _views_in_same_family<T: Database>(db: &T) {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    let view2 = View::new(&snapshot, IDX_2);
+    let view1 = View::new(snapshot.as_ref(), IDX_1);
+    let view2 = View::new(snapshot.as_ref(), IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -215,7 +215,7 @@ where
 
     {
         let snapshot = db.snapshot();
-        let view = View::new(&snapshot, address);
+        let view = View::new(snapshot.as_ref(), address);
 
         assert_eq!(view.get_bytes(&[1]), Some(vec![5]));
         assert_iter(&view, 0, &[(1, 5), (3, 6)]);
@@ -247,7 +247,7 @@ where
 
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let view = View::new(&snapshot, address);
+    let view = View::new(snapshot.as_ref(), address);
     assert_iter(&view, 0, &[(3, 0), (4, 0)]);
     assert_iter(&view, 4, &[(4, 0)]);
 }
@@ -352,7 +352,7 @@ fn test_database_check_correct_version() {
     let db = TemporaryDB::default();
     let snapshot = db.snapshot();
 
-    let view = View::new(&snapshot, ResolvedAddress::system(db::DB_METADATA));
+    let view = View::new(snapshot.as_ref(), ResolvedAddress::system(db::DB_METADATA));
     let version: u8 = view.get(db::VERSION_NAME).unwrap();
     assert_eq!(version, db::DB_VERSION);
 }
@@ -364,7 +364,7 @@ fn test_database_check_incorrect_version() {
     let opts = DBOptions::default();
     // Writes different version to metadata.
     {
-        let db = RocksDB::open(&dir, &opts).unwrap();
+        let db = RocksDB::open(dir.path(), &opts).unwrap();
         let fork = db.fork();
         {
             let mut view = View::new(&fork, ResolvedAddress::system(db::DB_METADATA));
@@ -373,7 +373,7 @@ fn test_database_check_incorrect_version() {
         db.merge(fork.into_patch()).unwrap();
     }
     // Tries to open modified database.
-    RocksDB::open(&dir, &opts).unwrap();
+    RocksDB::open(dir.path(), &opts).unwrap();
 }
 
 #[test]
@@ -422,8 +422,8 @@ fn multiple_views() {
     {
         // Reading from a snapshot
         let snapshot = db.snapshot();
-        let view = View::new(&snapshot, IDX_NAME);
-        let prefixed_view = View::new(&snapshot, PREFIXED_IDX);
+        let view = View::new(snapshot.as_ref(), IDX_NAME);
+        let prefixed_view = View::new(snapshot.as_ref(), PREFIXED_IDX);
 
         assert_iter(&view, 0, &[(1, 10), (2, 20), (3, 30)]);
         assert_iter(&prefixed_view, 0, &[(1, 30), (3, 40), (5, 50)]);
@@ -530,8 +530,8 @@ fn views_in_same_family() {
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    let view2 = View::new(&snapshot, IDX_2);
+    let view1 = View::new(snapshot.as_ref(), IDX_1);
+    let view2 = View::new(snapshot.as_ref(), IDX_2);
 
     assert_iter(&view1, 0, &[(1, 10), (2, 30), (3, 40)]);
     assert_iter(&view2, 0, &[(0, 0), (1, 2), (2, 4)]);
@@ -633,7 +633,7 @@ fn clear_sibling_views() {
     }
     db.merge(fork.into_patch()).unwrap();
 
-    assert_view_states(&db.snapshot());
+    assert_view_states(db.snapshot().as_ref());
 
     let fork = db.fork();
     assert_view_states(&fork);
@@ -757,57 +757,6 @@ fn mutable_and_immutable_borrows_for_different_views() {
     assert_eq!(immutable_view2.get_bytes(&[1]), None);
 }
 
-#[test]
-fn views_based_on_rc_fork() {
-    fn test_lifetime<T: 'static>(_: T) {}
-
-    const IDX_1: (&str, u64) = ("foo", 23);
-    const IDX_2: (&str, u64) = ("foo", 42);
-
-    let db = TemporaryDB::new();
-    let fork = Rc::new(db.fork());
-
-    let view1 = View::new(fork.clone(), IDX_1);
-    let view2 = View::new(fork.clone(), IDX_2);
-    // Test that views have 'static lifetime.
-    test_lifetime(view1);
-    test_lifetime(view2);
-
-    let mut view1 = View::new(fork.clone(), IDX_1);
-    let mut view2 = View::new(fork.clone(), IDX_2);
-    view1.put(&vec![0], vec![1]);
-    view1.put(&vec![1], vec![2]);
-    assert_eq!(view1.get_bytes(&[0]), Some(vec![1]));
-    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
-    view2.put(&vec![0], vec![3]);
-    view1.put(&vec![0], vec![3]);
-    drop(view1);
-    view2.put(&vec![2], vec![4]);
-    drop(view2);
-
-    {
-        // Check that changes introduced by the both views are reflected in the fork.
-        let mut view1 = View::new(&*fork, IDX_1);
-        assert_eq!(view1.get_bytes(&[0]), Some(vec![3]));
-        view1.remove(&vec![0]);
-        let view2 = View::new(fork.clone(), IDX_2);
-        assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
-    }
-
-    // ...and that these changes propagate to patch.
-    let patch = Rc::try_unwrap(fork).unwrap().into_patch();
-    db.merge_sync(patch).unwrap();
-    let snapshot = db.snapshot();
-    let view1 = View::new(&snapshot, IDX_1);
-    assert_eq!(view1.get_bytes(&[0]), None);
-    assert_eq!(view1.get_bytes(&[1]), Some(vec![2]));
-
-    let view2 = View::new(&snapshot, IDX_2);
-    assert_eq!(view2.get_bytes(&[0]), Some(vec![3]));
-    assert_eq!(view2.get_bytes(&[1]), None);
-    assert_eq!(view2.get_bytes(&[2]), Some(vec![4]));
-}
-
 fn test_metadata(addr: impl Into<IndexAddress>) {
     let addr = addr.into();
     let db = TemporaryDB::new();
@@ -817,14 +766,14 @@ fn test_metadata(addr: impl Into<IndexAddress>) {
         .map_err(drop)
         .unwrap();
     assert!(
-        ViewWithMetadata::get_or_create(&db.snapshot(), &addr, IndexType::Map)
+        ViewWithMetadata::get_or_create(db.snapshot().as_ref(), &addr, IndexType::Map)
             .unwrap()
             .is_phantom()
     );
     db.merge(fork.into_patch()).unwrap();
 
     let snapshot = db.snapshot();
-    let view = ViewWithMetadata::get_or_create(&snapshot, &addr, IndexType::Map).unwrap();
+    let view = ViewWithMetadata::get_or_create(snapshot.as_ref(), &addr, IndexType::Map).unwrap();
     assert_eq!(view.index_type(), IndexType::Map);
     assert!(!view.is_phantom());
 
@@ -942,7 +891,7 @@ fn test_metadata_index_wrong_type() {
     db.merge(fork.into_patch()).unwrap();
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
-    let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
+    let err = ListIndex::<_, Vec<u8>>::from_access(snapshot.as_ref(), "simple".into()).unwrap_err();
 
     assert_matches!(
         err,
@@ -975,7 +924,7 @@ fn test_valid_tombstone() {
     // ...even after the fork is merged.
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let migration = Migration::new("foo", &snapshot);
+    let migration = Migration::new("foo", snapshot.as_ref());
     let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
     assert_matches!(
         err.kind,
@@ -1047,35 +996,4 @@ fn check_valid_name(name: &str) -> bool {
         let _: ListIndex<_, u8> = fork.get_list(name.as_ref());
     }));
     catch_result.is_ok()
-}
-
-#[test]
-fn fork_from_patch() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    {
-        let mut index = fork.get_list("index");
-        index.push(1);
-        index.push(2);
-        index.push(3);
-        let last = index.pop();
-        assert_eq!(last, Some(3));
-        index.set(1, 5);
-    }
-
-    let patch = fork.into_patch();
-    let fork: Fork = patch.into();
-    {
-        let index = fork.get_list("index");
-        assert_eq!(index.get(0), Some(1));
-        assert_eq!(index.get(1), Some(5));
-        assert_eq!(index.get(2), None);
-
-        let items: Vec<i32> = index.iter().collect();
-        assert_eq!(items.len(), 2);
-        assert_eq!(items, vec![1, 5]);
-    }
-
-    db.merge(fork.into_patch())
-        .expect("Fork created from patch should be merged successfully");
 }

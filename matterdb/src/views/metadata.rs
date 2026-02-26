@@ -1,7 +1,13 @@
-use std::{borrow::Cow, convert::TryFrom, io::Error, mem, num::NonZeroU64, vec};
+use std::{
+    borrow::Cow,
+    convert::TryFrom,
+    io::{Error, Read as _},
+    mem,
+    num::NonZeroU64,
+    vec,
+};
 
-use anyhow::{ensure, format_err};
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use anyhow::{Context, ensure, format_err};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -84,6 +90,18 @@ impl BinaryAttribute for () {
     }
 }
 
+fn read_u32_le(buffer: &mut &[u8]) -> Result<u32, Error> {
+    let mut value_bytes = [0_u8; 4];
+    buffer.read_exact(&mut value_bytes)?;
+    Ok(u32::from_le_bytes(value_bytes))
+}
+
+fn read_u64_le(buffer: &mut &[u8]) -> Result<u64, Error> {
+    let mut value_bytes = [0_u8; 8];
+    buffer.read_exact(&mut value_bytes)?;
+    Ok(u64::from_le_bytes(value_bytes))
+}
+
 #[allow(clippy::use_self)] // false positive
 impl BinaryAttribute for u64 {
     fn size(&self) -> usize {
@@ -91,11 +109,11 @@ impl BinaryAttribute for u64 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.write_u64::<LittleEndian>(*self).unwrap();
+        buffer.extend_from_slice(&self.to_le_bytes());
     }
 
     fn read(mut buffer: &[u8]) -> Result<Self, Error> {
-        buffer.read_u64::<LittleEndian>()
+        read_u64_le(&mut buffer)
     }
 }
 
@@ -140,15 +158,15 @@ where
         }
         let mut buf = Vec::with_capacity(capacity);
 
-        buf.write_u64::<LittleEndian>(self.identifier.get())
-            .unwrap();
-        buf.write_u32::<LittleEndian>(self.index_type as u32)
-            .unwrap();
+        buf.extend_from_slice(&self.identifier.get().to_le_bytes());
+        buf.extend_from_slice(&(self.index_type as u32).to_le_bytes());
+
         if let Some(state) = &self.state {
             // Writes index state in TLV (tag, length, value) form.
-            buf.write_u32::<LittleEndian>(INDEX_STATE_TAG).unwrap();
-            let size = state.size().try_into().expect("state size is too large");
-            buf.write_u32::<LittleEndian>(size).unwrap();
+            buf.extend_from_slice(&INDEX_STATE_TAG.to_le_bytes());
+
+            let size: u32 = state.size().try_into().expect("state size is too large");
+            buf.extend_from_slice(&size.to_le_bytes());
             state.write(&mut buf);
         }
         buf
@@ -157,9 +175,9 @@ where
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut bytes = bytes.as_ref();
 
-        let identifier = NonZeroU64::new(bytes.read_u64::<LittleEndian>()?)
-            .ok_or_else(|| format_err!("IndexMetadata identifier is 0"))?;
-        let index_type = bytes.read_u32::<LittleEndian>()?;
+        let identifier =
+            NonZeroU64::new(read_u64_le(&mut bytes)?).context("IndexMetadata identifier is 0")?;
+        let index_type = read_u32_le(&mut bytes)?;
         let index_type = IndexType::try_from(index_type)
             .map_err(|_| format_err!("Unknown index type: {index_type}"))?;
 
@@ -173,8 +191,8 @@ where
         }
 
         // Reads index state in TLV (tag, length, value) form.
-        let state_tag = bytes.read_u32::<LittleEndian>()?;
-        let state_len = bytes.read_u32::<LittleEndian>()? as usize;
+        let state_tag = read_u32_le(&mut bytes)?;
+        let state_len = read_u32_le(&mut bytes)? as usize;
 
         ensure!(
             state_tag == INDEX_STATE_TAG,
@@ -619,7 +637,7 @@ mod tests {
         BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool,
         NonZeroU64, vec,
     };
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -775,7 +793,7 @@ mod prop_tests {
     };
 
     use super::{GroupKeys, IndexAddress, RawAccess};
-    use crate::{Database, TemporaryDB, access::CopyAccessExt};
+    use crate::{Database, TemporaryDB, access::AccessExt};
 
     const ACTIONS_MAX_LEN: usize = 30;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;
@@ -854,9 +872,9 @@ mod prop_tests {
                 }
                 Action::MergeFork => {
                     let patch = fork.into_patch();
-                    check_groups(&patch, &groups, buffer_size)?;
+                    check_groups(patch.as_ref(), &groups, buffer_size)?;
                     db.merge(patch).unwrap();
-                    check_groups(&db.snapshot(), &groups, buffer_size)?;
+                    check_groups(db.snapshot().as_ref(), &groups, buffer_size)?;
                     fork = db.fork();
                 }
             }
@@ -871,7 +889,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, DEFAULT_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 
@@ -881,7 +899,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 
@@ -891,7 +909,7 @@ mod prop_tests {
         let db = TemporaryDB::new();
         proptest!(|(actions in actions_generator)| {
             apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
-            db.clear().unwrap();
+            db.clear();
         });
     }
 }

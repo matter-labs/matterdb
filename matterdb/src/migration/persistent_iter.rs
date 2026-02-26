@@ -11,7 +11,7 @@ use anyhow::{bail, ensure};
 
 use crate::{
     BinaryKey, BinaryValue, Entry,
-    access::{Access, AccessExt, RawAccess, RawAccessMut},
+    access::{Access, FromAccess, RawAccess, RawAccessMut},
     indexes::{Entries, IndexIterator},
 };
 
@@ -77,17 +77,17 @@ where
 /// Like indexes, persistent iterators are identified by an address. Likewise, they are subject
 /// to the borrowing rules (e.g., attempting to create two instances of the same iterator will
 /// result in a runtime error). When migrating data, it makes sense to store iterators
-/// in the associated [`Scratchpad`]. In this way, iterators will be automatically removed
+/// in the associated [`Scratchpad`](crate::migration::Scratchpad). In this way, iterators will be automatically removed
 /// when the migration is over.
 ///
 /// # Examples
 ///
-/// [`MigrationHelper`] offers convenient iterator API via `iter_loop` method, which covers
+/// [`MigrationHelper`](super::MigrationHelper) offers convenient iterator API via `iter_loop` method, which covers
 /// basic use cases. When `iter_loop` is not enough, a persistent iterator can be instantiated
 /// independently:
 ///
 /// ```
-/// # use matterdb::{access::{AccessExt, CopyAccessExt}, Database, TemporaryDB};
+/// # use matterdb::{access::AccessExt, Database, TemporaryDB};
 /// # use matterdb::migration::{MigrationHelper, PersistentIter};
 /// let db = TemporaryDB::new();
 /// // Create data for migration.
@@ -117,9 +117,6 @@ where
 /// assert_eq!(item, "100");
 /// assert_eq!(iter.count(), 22); // number of remaining items
 /// ```
-///
-/// [`Scratchpad`]: struct.Scratchpad.html
-/// [`MigrationHelper`]: struct.MigrationHelper.html
 pub struct PersistentIter<'a, T: RawAccess, I: IndexIterator> {
     inner: Inner<'a, T, I>,
 }
@@ -173,11 +170,17 @@ where
     I: IndexIterator,
 {
     /// Creates a new persistent iterator.
+    ///
+    /// # Panics
+    ///
+    /// Panics on database errors.
     pub fn new<A>(access: &A, name: &str, index: &'a I) -> Self
     where
         A: Access<Base = T>,
     {
-        let position_entry: Entry<_, IteratorPosition<I::Key>> = access.get_entry(name);
+        let position_entry: Entry<_, IteratorPosition<I::Key>> =
+            Entry::from_access(access.clone(), name.into())
+                .unwrap_or_else(|e| panic!("MerkleDB error: {e}"));
         let position = position_entry.get();
 
         let start_key = match position {
@@ -242,8 +245,6 @@ where
 ///
 /// This iterator can be used similarly to [`PersistentIter`]; the only difference is the
 /// type of items yielded by the iterator.
-///
-/// [`PersistentIter`]: struct.PersistentIter.html
 pub struct PersistentKeys<'a, T: RawAccess, I: IndexIterator> {
     base_iter: PersistentIter<'a, T, I>,
 }
@@ -324,11 +325,12 @@ where
     /// when this is a priori not the case.
     pub(super) fn all_ended(&self) -> bool {
         for name in &self.names {
-            let pos = self
-                .access
-                .clone()
-                .get_entry::<_, IteratorPosition<()>>(name.as_str())
-                .get();
+            let pos = Entry::<_, IteratorPosition<()>>::from_access(
+                self.access.clone(),
+                name.clone().into(),
+            )
+            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
+            .get();
             if pos != Some(IteratorPosition::Ended) {
                 return false;
             }
@@ -339,8 +341,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessExt, IteratorPosition, PersistentIter, PersistentKeys};
-    use crate::{Database, MapIndex, TemporaryDB, access::CopyAccessExt, migration::Scratchpad};
+    use super::{IteratorPosition, PersistentIter, PersistentKeys};
+    use crate::{Database, MapIndex, TemporaryDB, access::AccessExt, migration::Scratchpad};
 
     #[test]
     fn persistent_iter_for_map() {

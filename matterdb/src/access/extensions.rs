@@ -1,154 +1,11 @@
 //! Extension traits to simplify index instantiation.
 
 use crate::{
-    BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
-    SparseListIndex,
-    access::{Access, FromAccess},
+    BinaryKey, BinaryValue, Entry, Fork, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
+    Snapshot, SparseListIndex,
+    access::{Access, FromAccess, RawAccess},
     views::IndexType,
 };
-
-/// Extension trait allowing for easy access to indexes from any type implementing
-/// [`Access`] + `Copy`.
-///
-/// # Implementation details
-///
-/// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
-/// an access error, the methods of this trait will `unwrap()` the error and panic.
-/// This trait is helpful for references implementing [`Access`], such as `&Fork` or `&dyn Snapshot`
-/// because Rust method resolution does not apply [`AccessExt`] to variables of corresponding types.
-/// For example, if fork has type Fork, then `fork.get_list("foo")` is not resolved
-/// as `AccessExt::get_list(..)`, only `(&fork).get_list("foo")` is.
-/// [`Access`]: trait.Access.html
-/// [`AccessExt`]: trait.AccessExt.html
-/// [`FromAccess`]: trait.FromAccess.html
-///
-/// # Examples
-///
-/// ```
-/// use matterdb::{access::CopyAccessExt, Database, ListIndex, TemporaryDB};
-///
-/// let db = TemporaryDB::new();
-/// let fork = db.fork();
-/// // Extension methods can be used on `Fork`s:
-/// {
-///     let mut list: ListIndex<_, String> = fork.get_list("list");
-///     list.push("foo".to_owned());
-/// }
-///
-/// // ...and on `Snapshot`s:
-/// let snapshot = db.snapshot();
-/// assert!(snapshot
-///     .get_map::<_, u64, String>("map")
-///     .get(&0)
-///     .is_none());
-///
-/// // ...and on `ReadonlyFork`s:
-/// {
-///     let list = fork.readonly().get_list::<_, String>("list");
-///     assert_eq!(list.len(), 1);
-/// }
-///
-/// // ...and on `Patch`es:
-/// let patch = fork.into_patch();
-/// let list = patch.get_list::<_, String>("list");
-/// assert_eq!(list.len(), 1);
-/// ```
-pub trait CopyAccessExt: Access + Copy {
-    /// Returns a group of indexes. All indexes in the group have the same type.
-    /// Indexes are initialized lazily; i.e., no initialization is performed when the group
-    /// is created.
-    ///
-    /// Note that unlike other methods, this one requires address to be a string.
-    /// This is to prevent collisions among groups.
-    fn get_group<K, I>(self, name: impl Into<String>) -> Group<Self, K, I>
-    where
-        K: BinaryKey + ?Sized,
-        I: FromAccess<Self>,
-    {
-        Group::from_access(self, IndexAddress::from_root(name))
-            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets an entry index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// If the index exists, but is not an entry.
-    fn get_entry<I, V>(self, addr: I) -> Entry<Self::Base, V>
-    where
-        I: Into<IndexAddress>,
-        V: BinaryValue,
-    {
-        Entry::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets a list index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// If the index exists, but is not a list.
-    fn get_list<I, V>(self, addr: I) -> ListIndex<Self::Base, V>
-    where
-        I: Into<IndexAddress>,
-        V: BinaryValue,
-    {
-        ListIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets a map index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// If the index exists, but is not a map.
-    fn get_map<I, K, V>(self, addr: I) -> MapIndex<Self::Base, K, V>
-    where
-        I: Into<IndexAddress>,
-        K: BinaryKey + ?Sized,
-        V: BinaryValue,
-    {
-        MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets a sparse list index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// If the index exists, but is not a sparse list.
-    fn get_sparse_list<I, V>(self, addr: I) -> SparseListIndex<Self::Base, V>
-    where
-        I: Into<IndexAddress>,
-        V: BinaryValue,
-    {
-        SparseListIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets a key set index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// If the index exists, but is not a key set.
-    fn get_key_set<I, K>(self, addr: I) -> KeySetIndex<Self::Base, K>
-    where
-        I: Into<IndexAddress>,
-        K: BinaryKey + ?Sized,
-    {
-        KeySetIndex::from_access(self, addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-    }
-
-    /// Gets index type at the specified address, or `None` if there is no index.
-    fn index_type<I>(self, addr: I) -> Option<IndexType>
-    where
-        I: Into<IndexAddress>,
-    {
-        self.get_index_metadata(addr.into())
-            .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
-            .map(|metadata| metadata.index_type())
-    }
-}
-
-impl<T: Access + Copy> CopyAccessExt for T {}
 
 /// Extension trait allowing for easy access to indexes from any type implementing
 /// [`Access`].
@@ -157,26 +14,32 @@ impl<T: Access + Copy> CopyAccessExt for T {}
 ///
 /// This trait is essentially a thin wrapper around [`FromAccess`]. Where [`FromAccess`] returns
 /// an access error, the methods of this trait will `unwrap()` the error and panic.
-/// For a version on [`AccessExt`] traits designed for `Copy` types (e.g. `&Fork` and
-/// `&dyn Snapshot`) see [`CopyAccessExt`] trait.
-///
-/// [`Access`]: trait.Access.html
-/// [`FromAccess`]: trait.FromAccess.html
-/// [`AccessExt`]: trait.AccessExt.html
-/// [`CopyAccessExt`]: trait.CopyAccessExt.html
-pub trait AccessExt: Access {
+pub trait AccessExt {
+    /// Shortcut for [`Self::Ref`]`::Base`, similar to `Item` in `IntoIterator`. Allows to express
+    /// type boundaries more concisely.
+    type Base<'a>: RawAccess
+    where
+        Self: 'a;
+
+    /// [`Access`] that this extension is based on: either `Self` or `&'a Self`.
+    type Ref<'a>: Access<Base = Self::Base<'a>>
+    where
+        Self: 'a;
+
+    fn get_ref(&self) -> Self::Ref<'_>;
+
     /// Returns a group of indexes. All indexes in the group have the same type.
     /// Indexes are initialized lazily; i.e., no initialization is performed when the group
     /// is created.
     ///
     /// Note that unlike other methods, this one requires address to be a string.
     /// This is to prevent collisions among groups.
-    fn get_group<K, I>(&self, name: impl Into<String>) -> Group<Self, K, I>
+    fn get_group<'s, K, I>(&'s self, name: impl Into<String>) -> Group<Self::Ref<'s>, K, I>
     where
         K: BinaryKey + ?Sized,
-        I: FromAccess<Self>,
+        I: FromAccess<Self::Ref<'s>>,
     {
-        Group::from_access(self.clone(), IndexAddress::from_root(name))
+        Group::from_access(self.get_ref(), IndexAddress::from_root(name))
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -185,12 +48,12 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not an entry.
-    fn get_entry<I, V>(&self, addr: I) -> Entry<Self::Base, V>
+    fn get_entry<I, V>(&self, addr: I) -> Entry<Self::Base<'_>, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        Entry::from_access(self.clone(), addr.into())
+        Entry::from_access(self.get_ref(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -199,12 +62,12 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a list.
-    fn get_list<I, V>(&self, addr: I) -> ListIndex<Self::Base, V>
+    fn get_list<I, V>(&self, addr: I) -> ListIndex<Self::Base<'_>, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ListIndex::from_access(self.clone(), addr.into())
+        ListIndex::from_access(self.get_ref(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -213,13 +76,13 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a map.
-    fn get_map<I, K, V>(&self, addr: I) -> MapIndex<Self::Base, K, V>
+    fn get_map<I, K, V>(&self, addr: I) -> MapIndex<Self::Base<'_>, K, V>
     where
         I: Into<IndexAddress>,
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        MapIndex::from_access(self.clone(), addr.into())
+        MapIndex::from_access(self.get_ref(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -228,12 +91,12 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a sparse list.
-    fn get_sparse_list<I, V>(&self, addr: I) -> SparseListIndex<Self::Base, V>
+    fn get_sparse_list<I, V>(&self, addr: I) -> SparseListIndex<Self::Base<'_>, V>
     where
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        SparseListIndex::from_access(self.clone(), addr.into())
+        SparseListIndex::from_access(self.get_ref(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -242,12 +105,12 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a key set.
-    fn get_key_set<I, K>(&self, addr: I) -> KeySetIndex<Self::Base, K>
+    fn get_key_set<I, K>(&self, addr: I) -> KeySetIndex<Self::Base<'_>, K>
     where
         I: Into<IndexAddress>,
         K: BinaryKey + ?Sized,
     {
-        KeySetIndex::from_access(self.clone(), addr.into())
+        KeySetIndex::from_access(self.get_ref(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
     }
 
@@ -256,18 +119,49 @@ pub trait AccessExt: Access {
     where
         I: Into<IndexAddress>,
     {
-        self.clone()
+        self.get_ref()
             .get_index_metadata(addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {e}"))
             .map(|metadata| metadata.index_type())
     }
 }
 
-impl<T: Access> AccessExt for T {}
+impl<T: Access> AccessExt for T {
+    type Base<'a>
+        = <Self as Access>::Base
+    where
+        Self: 'a;
+    type Ref<'a>
+        = Self
+    where
+        Self: 'a;
+
+    fn get_ref(&self) -> Self::Ref<'_> {
+        self.clone()
+    }
+}
+
+impl AccessExt for Fork {
+    type Base<'a> = &'a Self;
+    type Ref<'a> = &'a Self;
+
+    fn get_ref(&self) -> Self::Ref<'_> {
+        self
+    }
+}
+
+impl AccessExt for dyn Snapshot {
+    type Base<'a> = &'a Self;
+    type Ref<'a> = &'a Self;
+
+    fn get_ref(&self) -> Self::Ref<'_> {
+        self
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use super::{AccessExt, CopyAccessExt, IndexType};
+    use super::{AccessExt, IndexType};
     use crate::{Database, TemporaryDB, access::Prefixed, migration::Migration};
 
     #[test]
@@ -281,9 +175,12 @@ mod tests {
         assert_eq!(fork.index_type(("fam", &1_u8)), None);
 
         let patch = fork.into_patch();
-        assert_eq!(patch.index_type("list"), Some(IndexType::List));
-        assert_eq!(patch.index_type(("fam", &0_u8)), Some(IndexType::Map));
-        assert_eq!(patch.index_type(("fam", &1_u8)), None);
+        {
+            let patch = patch.as_ref();
+            assert_eq!(patch.index_type("list"), Some(IndexType::List));
+            assert_eq!(patch.index_type(("fam", &0_u8)), Some(IndexType::Map));
+            assert_eq!(patch.index_type(("fam", &1_u8)), None);
+        }
 
         db.merge(patch).unwrap();
         let snapshot = db.snapshot();
@@ -314,7 +211,7 @@ mod tests {
         fork.flush_migration("some");
 
         let patch = fork.into_patch();
-        let ns = Prefixed::new("some", &patch);
+        let ns = Prefixed::new("some", patch.as_ref());
         assert_eq!(ns.clone().index_type("list"), Some(IndexType::List));
         assert_eq!(ns.clone().index_type(("entry", &0_u8)), None);
         assert_eq!(

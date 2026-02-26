@@ -3,7 +3,7 @@
 
 use matterdb::{
     Database, Fork, IndexAddress, IndexType, TemporaryDB,
-    access::CopyAccessExt,
+    access::AccessExt,
     migration::{PersistentIter, PersistentKeys, Scratchpad, rollback_migration},
 };
 use proptest::{

@@ -3,16 +3,17 @@
 //! # Overview
 //!
 //! The core type in this module is the [`Access`] trait, which provides ability to access
-//! [indexes] from the database. The `Access` trait has several implementations:
+//! [indexes](crate::indexes) from the database. The `Access` trait has several implementations:
 //!
 //! - `Access` is implemented for [`RawAccess`]es, that is, types that provide access to the
-//!   entire database. [`Snapshot`], [`Fork`] and [`ReadonlyFork`] fall into this category.
+//!   entire database. [`Snapshot`](crate::Snapshot), [`Fork`](crate::Fork) and [`ReadonlyFork`](crate::ReadonlyFork)
+//!   fall into this category.
 //! - [`Prefixed`] restricts an access to a single *namespace*.
-//! - [`Migration`]s are used for data created during [migrations]. Similar to `Prefixed`, migrations
-//!   are separated by namespaces.
-//! - [`Scratchpad`]s can be used for temporary data. They are distinguished by namespaces as well.
+//! - [`Migration`](crate::migration::Migration)s are used for data created during [migrations](crate::migration).
+//!   Similar to `Prefixed`, migrations are separated by namespaces.
+//! - [`Scratchpad`](crate::migration::Scratchpad)s can be used for temporary data. They are distinguished by namespaces as well.
 //!
-//! [`CopyAccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
+//! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
 //! is useful in quick-and-dirty testing. For more complex applications, consider deriving
 //! data schema via [`FromAccess`].
 //!
@@ -27,26 +28,13 @@
 //! - However, if we consider multiple accesses, indexes can alias. For example, an index
 //!   with address `bar` from a `Prefixed<&Fork>` in namespace `foo` can also be accessed via
 //!   address `foo.bar` from the underlying `Fork`.
-//!
-//! [`Access`]: trait.Access.html
-//! [indexes]: ../index.html#indexes
-//! [`RawAccess`]: trait.RawAccess.html
-//! [`Snapshot`]: ../trait.Snapshot.html
-//! [`Fork`]: ../struct.Fork.html
-//! [`ReadonlyFork`]: ../struct.ReadonlyFork.html
-//! [`Prefixed`]: struct.Prefixed.html
-//! [`Migration`]: ../migration/struct.Migration.html
-//! [migrations]: ../migration/index.html
-//! [`Scratchpad`]: ../migration/struct.Scratchpad.html
-//! [`CopyAccessExt`]: trait.CopyAccessExt.html
-//! [`FromAccess`]: trait.FromAccess.html
 
 use std::fmt;
 
 use thiserror::Error;
 
-pub use self::extensions::{AccessExt, CopyAccessExt};
-pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
+pub use self::extensions::AccessExt;
+pub use crate::views::{RawAccess, RawAccessMut};
 use crate::{
     BinaryKey,
     validation::assert_valid_name_component,
@@ -59,9 +47,7 @@ mod extensions;
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
 /// it instantiates several crate-private types. Correspondingly, `Access` methods
-/// rarely need to be used directly; use [its extension trait][`CopyAccessExt`] instead.
-///
-/// [`CopyAccessExt`]: trait.CopyAccessExt.html
+/// rarely need to be used directly; use [its extension trait](AccessExt) instead.
 ///
 /// # Examples
 ///
@@ -107,13 +93,10 @@ pub trait Access: Clone {
     /// Returns an iterator over keys in a group with the specified address.
     ///
     /// The iterator buffers keys in memory and may become inconsistent for accesses
-    /// based on [`ReadonlyFork`].
-    ///
-    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
+    /// based on [`ReadonlyFork`](crate::ReadonlyFork).
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
-        K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>;
+        K: BinaryKey + ?Sized;
 }
 
 impl<T: RawAccess> Access for T {
@@ -134,7 +117,6 @@ impl<T: RawAccess> Access for T {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         GroupKeys::new(self, &base_addr)
     }
@@ -147,15 +129,12 @@ impl<T: RawAccess> Access for T {
 /// separation. A set of indexes to which `Prefixed` provides access does not intersect
 /// with a set of indexes accessed by a `Prefixed` instance with another prefix. Additionally,
 /// index in `Prefixed` accesses do not intersect with indexes in special-purpose `Access`
-/// implementations ([`Migration`]s and [`Scratchpad`]s).
-///
-/// [`Migration`]: ../migration/struct.Migration.html
-/// [`Scratchpad`]: ../migration/struct.Scratchpad.html
+/// implementations ([`Migration`](crate::migration::Migration)s and [`Scratchpad`](crate::migration::Scratchpad)s).
 ///
 /// # Examples
 ///
 /// ```
-/// use matterdb::{access::{AccessExt, CopyAccessExt, Prefixed}, Database, TemporaryDB};
+/// use matterdb::{access::{AccessExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -170,26 +149,12 @@ pub struct Prefixed<T> {
     prefix: String,
 }
 
-// **NB.** Must not be made public! This would allow the caller to violate access restrictions
-// imposed by `Prefixed`.
-impl<T> Prefixed<T> {
-    pub(crate) fn access(&self) -> &T {
-        &self.access
-    }
-
-    pub(crate) fn into_parts(self) -> (String, T) {
-        (self.prefix, self.access)
-    }
-}
-
 impl<T: RawAccess> Prefixed<T> {
     /// Creates a new prefixed access.
     ///
     /// # Panics
     ///
-    /// - Will panic if the prefix is not a [valid prefix name].
-    ///
-    /// [valid prefix name]: ../validation/fn.is_valid_index_name_component.html
+    /// - Will panic if the prefix is not a [valid prefix name](crate::validation::is_valid_index_name_component()).
     pub fn new(prefix: impl Into<String>, access: T) -> Self {
         let prefix = prefix.into();
         assert_valid_name_component(prefix.as_ref());
@@ -217,7 +182,6 @@ impl<T: RawAccess> Access for Prefixed<T> {
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,
-        Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         let prefixed_addr = base_addr.prepend_name(self.prefix.as_ref());
         self.access.group_keys(prefixed_addr)
@@ -287,12 +251,9 @@ pub enum AccessErrorKind {
 /// The access to DB can be readonly or read-write, depending on the `T: Access` type param.
 /// Most object should implement `FromAccess<T>` for all `T: Access`.
 ///
-/// Simplest `FromAccess` implementors are indexes; it is also implemented for [`Lazy`] and [`Group`].
+/// Simplest `FromAccess` implementors are indexes; it is also implemented for [`Group`](crate::Group).
 /// `FromAccess` can be implemented for more complex *components*. Thus, `FromAccess` can
 /// be used to compose storage objects from simpler ones.
-///
-/// [`Lazy`]: ../struct.Lazy.html
-/// [`Group`]: ../indexes/group/struct.Group.html
 ///
 /// # Examples
 ///
@@ -302,8 +263,8 @@ pub enum AccessErrorKind {
 /// ```
 /// use matterdb_derive::FromAccess;
 /// # use matterdb::{
-/// #     access::{Access, CopyAccessExt, AccessError, FromAccess, RawAccessMut},
-/// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
+/// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
+/// #     Database, Entry, Group, MapIndex, IndexAddress, TemporaryDB,
 /// # };
 ///
 /// #[derive(FromAccess)]
@@ -334,11 +295,7 @@ pub enum AccessErrorKind {
 /// assert_eq!(map.len.get(), Some(2));
 /// # }
 ///
-/// // Components could be used with `Group` / `Lazy` out of the box:
-/// let lazy_map: Lazy<_, InsertOnlyMap<_>> =
-///     Lazy::from_access(&fork, "test".into())?;
-/// assert_eq!(lazy_map.get().map.get("foo").unwrap(), "FOO");
-///
+/// // Components could be used with `Group` out of the box:
 /// let group_of_maps: Group<_, u16, InsertOnlyMap<_>> =
 ///     fork.get_group("test_group");
 /// group_of_maps.get(&1).insert("baz", "BAZ".to_owned());
@@ -377,7 +334,7 @@ pub trait FromAccess<T: Access>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use super::{Access, AccessExt, CopyAccessExt, FromAccess, IndexType, Prefixed};
+    use super::{Access, AccessExt, FromAccess, IndexType, Prefixed};
     use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]
@@ -397,11 +354,12 @@ mod tests {
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
+        let snapshot = snapshot.as_ref();
         let list = snapshot.get_list::<_, i32>("test.foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
 
-        let prefixed = Prefixed::new("test", &snapshot);
+        let prefixed = Prefixed::new("test", snapshot);
         let list = prefixed.get_list::<_, i32>("foo");
         assert_eq!(list.len(), 3);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
@@ -425,10 +383,10 @@ mod tests {
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let foo_space = Prefixed::new("foo", &snapshot);
+        let foo_space = Prefixed::new("foo", snapshot.as_ref());
         let list = foo_space.get_list::<_, String>("test");
         assert_eq!(list.get(0), Some("Test".to_owned()));
-        let bar_space = Prefixed::new("bar", &snapshot);
+        let bar_space = Prefixed::new("bar", snapshot.as_ref());
         let list = bar_space.get_list::<_, u64>("test");
         assert_eq!(list.get(0), Some(1_u64));
 

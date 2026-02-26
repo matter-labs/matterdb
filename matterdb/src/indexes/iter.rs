@@ -9,8 +9,6 @@ use crate::{
 ///
 /// This structure is returned by the [`IndexIterator`] trait and by inherent methods
 /// of some indexes.
-///
-/// [`IndexIterator`]: trait.IndexIterator.html
 #[derive(Debug)]
 pub struct Entries<'a, K: ?Sized, V> {
     base_iter: Iter<'a, K, V>,
@@ -66,10 +64,8 @@ where
 
 /// Iterator over keys of an index.
 ///
-/// This structure is returned by [`Entries::skip_values`] , and by inherent methods
+/// This structure is returned by [`Entries::skip_values()`], and by inherent methods
 /// of some indexes.
-///
-/// [`Entries::skip_values`]: struct.Entries.html#method.skip_values
 #[derive(Debug)]
 pub struct Keys<'a, K: ?Sized> {
     base_iter: Iter<'a, K, ()>,
@@ -88,10 +84,8 @@ where
 
 /// Iterator over values of an index.
 ///
-/// This structure is returned by [`Entries::skip_keys`] , and by inherent methods
+/// This structure is returned by [`Entries::skip_keys()`], and by inherent methods
 /// of some indexes.
-///
-/// [`Entries::skip_keys`]: struct.Entries.html#method.skip_keys
 #[derive(Debug)]
 pub struct Values<'a, V> {
     base_iter: Iter<'a, (), V>,

@@ -2,10 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use matterdb::{
-    Database, DatabaseExt, IndexAddress, IndexType, TemporaryDB,
-    access::{Access, AccessExt},
-};
+use matterdb::{Database, IndexAddress, IndexType, TemporaryDB, access::AccessExt};
 use proptest::{
     collection::vec,
     prop_assert, prop_oneof, proptest, strategy,
@@ -42,7 +39,10 @@ fn generate_action() -> impl Strategy<Value = Action> + Clone {
     ]
 }
 
-fn check_index_does_not_exist<S: Access + Copy>(snapshot: S, addr: IndexAddress) -> TestCaseResult {
+fn check_index_does_not_exist<S: AccessExt + ?Sized>(
+    snapshot: &S,
+    addr: IndexAddress,
+) -> TestCaseResult {
     if let Some(index_type) = snapshot.index_type(addr) {
         prop_assert!(false, "{:?}", index_type);
     }
@@ -82,7 +82,7 @@ fn apply_actions(
     let patch = fork.into_patch();
     // Check the index contents just in case.
     for (addr, data) in &initial_data {
-        data.check(&patch, addr.to_owned())?;
+        data.check(patch.as_ref(), addr.to_owned())?;
     }
 
     db.merge(patch).unwrap();
@@ -122,22 +122,22 @@ fn apply_actions(
     // Check the new data in the DB.
     let new_snapshot = db.snapshot();
     for (addr, data) in &index_data {
-        data.check(&new_snapshot, addr.to_owned())?;
+        data.check(new_snapshot.as_ref(), addr.to_owned())?;
     }
     // Check old data in the backup.
     for (addr, data) in &initial_data {
-        data.check(&backup, addr.to_owned())?;
+        data.check(backup.as_ref(), addr.to_owned())?;
     }
     // Check aggregation in the backup.
     for new_addr in &new_indexes {
-        check_index_does_not_exist(&backup, new_addr.to_owned())?;
+        check_index_does_not_exist(backup.as_ref(), new_addr.to_owned())?;
     }
 
     // Merge the backup into the DB and run the checks on the snapshot.
     db.merge(backup).unwrap();
     let snapshot = db.snapshot();
     for new_addr in new_indexes {
-        check_index_does_not_exist(&snapshot, new_addr)?;
+        check_index_does_not_exist(snapshot.as_ref(), new_addr)?;
     }
 
     Ok(())
@@ -159,6 +159,6 @@ fn backup_with_db_clearing() {
     let actions = vec(generate_action(), 1..ACTIONS_MAX_LEN);
     proptest!(|(init_actions in actions.clone(), main_actions in actions)| {
         apply_actions(&db, init_actions, main_actions)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }

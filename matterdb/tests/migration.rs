@@ -134,7 +134,7 @@ fn check_intermediate_consistency(
 ) -> TestCaseResult {
     for ((ns, addr), data) in new_indexes {
         let migration = Migration::new(*ns, snapshot);
-        data.check(migration, addr.to_owned())?;
+        data.check(&migration, addr.to_owned())?;
     }
     Ok(())
 }
@@ -174,7 +174,7 @@ fn apply_actions(
                     work_on_index(&fork, addr.clone(), index_type, value.clone())
                 } else {
                     let migration = Migration::new(namespace, &fork);
-                    work_on_index(migration.clone(), addr.clone(), index_type, value.clone())
+                    work_on_index(&migration, addr.clone(), index_type, value.clone())
                 };
 
                 if !namespace.is_empty() {
@@ -253,7 +253,7 @@ fn apply_actions(
     check_final_consistency(&patch, &new_indexes)?;
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
-    check_final_consistency(&snapshot, &new_indexes)?;
+    check_final_consistency(snapshot.as_ref(), &new_indexes)?;
 
     Ok(())
 }
@@ -276,7 +276,7 @@ fn single_migration() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(SINGLE_NAMESPACE), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -287,7 +287,7 @@ fn single_migration_with_rollbacks() {
     let action = generate_action_with_rollbacks(SINGLE_NAMESPACE);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -296,7 +296,7 @@ fn multiple_migrations_with_synced_end() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(NAMESPACES), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }
 
@@ -306,6 +306,6 @@ fn multiple_migrations_with_synced_end_and_rollbacks() {
     let action = generate_action_with_rollbacks(NAMESPACES);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
-        db.clear().unwrap();
+        db.clear();
     });
 }

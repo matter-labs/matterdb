@@ -1,12 +1,9 @@
 //! A definition of `BinaryValue` trait and implementations for common types.
 
-use std::{borrow::Cow, io::Read};
+use std::borrow::Cow;
 
 use anyhow::{self, Context, format_err};
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, TimeZone, Utc};
-use rust_decimal::Decimal;
-use uuid::Uuid;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -18,8 +15,7 @@ use uuid::Uuid;
 /// Implementing `BinaryValue` for the type:
 ///
 /// ```
-/// use std::{borrow::Cow, io::{Read, Write}};
-/// use byteorder::{LittleEndian, ReadBytesExt, ByteOrder};
+/// use std::borrow::Cow;
 /// use matterdb::BinaryValue;
 ///
 /// #[derive(Clone)]
@@ -31,15 +27,15 @@ use uuid::Uuid;
 /// impl BinaryValue for Data {
 ///     fn to_bytes(&self) -> Vec<u8> {
 ///         let mut buf = vec![0_u8; 6];
-///         LittleEndian::write_i16(&mut buf[0..2], self.a);
-///         LittleEndian::write_u32(&mut buf[2..6], self.b);
+///         buf[0..2].copy_from_slice(&self.a.to_le_bytes());
+///         buf[2..6].copy_from_slice(&self.b.to_le_bytes());
 ///         buf
 ///     }
 ///
 ///     fn from_bytes(bytes: Cow<[u8]>) -> anyhow::Result<Self> {
 ///         let mut buf = bytes.as_ref();
-///         let a = buf.read_i16::<LittleEndian>()?;
-///         let b = buf.read_u32::<LittleEndian>()?;
+///         let a = i16::from_le_bytes(buf[0..2].try_into().unwrap());
+///         let b = u32::from_le_bytes(buf[2..6].try_into().unwrap());
 ///         Ok(Self { a, b })
 ///     }
 /// }
@@ -71,24 +67,21 @@ macro_rules! impl_binary_value_scalar {
                 vec![*self as u8]
             }
 
+            #[allow(clippy::cast_possible_wrap)]
             fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-                use byteorder::ReadBytesExt;
-                bytes.as_ref().$read().map_err(From::from)
+                Ok(bytes.get(0).copied().context("unexpected EOF")? as Self)
             }
         }
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
-        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
-                let mut v = vec![0; $len];
-                LittleEndian::$write(&mut v, *self);
-                v
+                self.to_le_bytes().to_vec()
             }
 
             fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-                use byteorder::ReadBytesExt;
-                bytes.as_ref().$read::<LittleEndian>().map_err(From::from)
+                let bytes = bytes.first_chunk().context("unexpected EOF")?;
+                Ok(Self::from_le_bytes(*bytes))
             }
         }
     };
@@ -156,61 +149,37 @@ impl BinaryValue for String {
     }
 }
 
-// FIXME Maybe we should remove this implementations. [ECR-2775]
-
 impl BinaryValue for DateTime<Utc> {
     fn to_bytes(&self) -> Vec<u8> {
         let secs = self.timestamp();
+        assert!(secs >= 0, "Cannot write negative timestamp");
         let nanos = self.timestamp_subsec_nanos();
 
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        let mut buffer = Vec::with_capacity(12);
+        buffer.extend_from_slice(&secs.to_le_bytes());
+        buffer.extend_from_slice(&nanos.to_le_bytes());
         buffer
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        let mut value = bytes.as_ref();
-        let secs = value.read_i64::<LittleEndian>()?;
-        let nanos = value.read_u32::<LittleEndian>()?;
+        let secs = i64::from_le_bytes(*bytes.first_chunk().context("unexpected EOF")?);
+        let bytes = &bytes[8..]; // skip the read `secs`
+        let nanos = u32::from_le_bytes(*bytes.first_chunk().context("unexpected EOF")?);
         Utc.timestamp_opt(secs, nanos)
             .single()
             .with_context(|| format!("stored timestamp out of range: {secs}, {nanos}"))
     }
 }
 
-impl BinaryValue for Uuid {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        Self::from_slice(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-impl BinaryValue for Decimal {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.serialize().to_vec()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
-        let mut value = bytes.as_ref();
-        let mut buf: [u8; 16] = [0; 16];
-        value.read_exact(&mut buf)?;
-        Ok(Self::deserialize(buf))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, str::FromStr};
+    use std::fmt;
 
     use chrono::Duration;
 
-    use super::{BinaryValue, Decimal, Utc, Uuid};
+    use super::*;
 
-    fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
+    fn assert_round_trip_eq<T: BinaryValue + PartialEq + fmt::Debug>(values: &[T]) {
         for value in values {
             let bytes = value.to_bytes();
             assert_eq!(
@@ -296,27 +265,5 @@ mod tests {
             Utc.timestamp_opt(0, 999_999_999).unwrap(),
         ];
         assert_round_trip_eq(&times);
-    }
-
-    #[test]
-    fn test_binary_form_uuid() {
-        let values = [
-            Uuid::nil(),
-            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-        ];
-        assert_round_trip_eq(&values);
-    }
-
-    #[test]
-    fn test_binary_form_decimal() {
-        let values = [
-            Decimal::from_str("3.14").unwrap(),
-            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
-            Decimal::new(9_497_628_354_687_268, 12),
-            Decimal::from_str("0").unwrap(),
-            Decimal::from_str("-0.000000000000000000019").unwrap(),
-        ];
-        assert_round_trip_eq(&values);
     }
 }

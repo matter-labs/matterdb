@@ -8,7 +8,7 @@ pub use self::{
     metadata::IndexType,
 };
 use crate::{
-    BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
+    BinaryKey, BinaryValue, BoxedIterator as BytesIter, Iterator as BytesIterator, Snapshot,
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     views::address::key_bytes,
 };
@@ -43,7 +43,7 @@ impl<T: RawAccess> fmt::Debug for ViewInner<T> {
 }
 
 /// Utility trait to provide optional references to `ViewChanges`.
-#[allow(unreachable_pub)] // FIXME: probably will be removed
+#[allow(unreachable_pub)]
 pub trait ChangeSet {
     fn as_ref(&self) -> Option<&ViewChanges>;
     /// Provides mutable reference to changes. The implementation for a `RawAccessMut` type
@@ -65,6 +65,7 @@ impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(self)
     }
+
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
     }
@@ -74,6 +75,7 @@ impl ChangeSet for ChangesMut<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(self)
     }
+
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         Some(&mut *self)
     }
@@ -83,12 +85,10 @@ impl ChangeSet for ChangesMut<'_> {
 /// changes relative to this snapshot. Depending on the implementation, the changes
 /// can be empty, immutable or mutable.
 ///
-/// This trait is rarely needs to be used directly; [`Access`] is a more high-level trait
+/// This trait is rarely needs to be used directly; [`Access`](crate::access::Access) is a more high-level trait
 /// encompassing access to database. In particular, using `snapshot()` method to convert
 /// the implementation into `&dyn Snapshot` is logically incorrect, because the snapshot
 /// may not reflect the most recent state of `RawAccess`.
-///
-/// [`Access`]: trait.Access.html
 pub trait RawAccess: Clone {
     /// Type of the `changes()` that will be applied to the database.
     type Changes: ChangeSet;
@@ -128,41 +128,17 @@ pub trait RawAccessMut: RawAccess {}
 
 impl<'a, T> RawAccessMut for T where T: RawAccess<Changes = ChangesMut<'a>> {}
 
-/// Converts index access to a readonly presentation. The conversion operation is cheap.
-pub trait AsReadonly: RawAccess {
-    /// Readonly version of the access.
-    type Readonly: RawAccess;
+impl RawAccess for &dyn Snapshot {
+    type Changes = ();
 
-    /// Performs the conversion.
-    fn as_readonly(&self) -> Self::Readonly;
+    fn snapshot(&self) -> &dyn Snapshot {
+        *self
+    }
+
+    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {
+        // no changes
+    }
 }
-
-macro_rules! impl_snapshot_access {
-    ($typ:ty) => {
-        impl RawAccess for $typ {
-            type Changes = ();
-
-            fn snapshot(&self) -> &dyn Snapshot {
-                self.as_ref()
-            }
-
-            fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
-        }
-
-        impl AsReadonly for $typ {
-            type Readonly = Self;
-
-            fn as_readonly(&self) -> Self::Readonly {
-                self.clone()
-            }
-        }
-    };
-}
-
-impl_snapshot_access!(&'_ dyn Snapshot);
-impl_snapshot_access!(&'_ Box<dyn Snapshot>);
-impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
-impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
 impl<T: RawAccess> ViewInner<T> {
     fn snapshot(&self) -> &dyn Snapshot {
@@ -284,7 +260,7 @@ impl<T: RawAccess> View<T> {
     {
         let iter_prefix = key_bytes(subprefix);
         Iter {
-            base_iter: self.iter_bytes(&iter_prefix),
+            base: self.iter_bytes(&iter_prefix),
             prefix: iter_prefix,
             detach_prefix: false,
             ended: false,
@@ -306,7 +282,7 @@ impl<T: RawAccess> View<T> {
         let iter_prefix = key_bytes(subprefix);
         let iter_from = key_bytes(from);
         Iter {
-            base_iter: self.iter_bytes(&iter_from),
+            base: self.iter_bytes(&iter_from),
             prefix: iter_prefix,
             detach_prefix: false,
             ended: false,
@@ -446,15 +422,10 @@ where
 
 /// An iterator over the entries of a `View`.
 ///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`View`]. See its documentation for details.
-///
-/// [`iter`]: struct.BaseIndex.html#method.iter
-/// [`iter_from`]: struct.BaseIndex.html#method.iter_from
-/// [`BaseIndex`]: struct.BaseIndex.html
+/// This struct is created by the [`iter`](View::iter()) or
+/// [`iter_from`](View::iter_from()) method on [`View`]. See their documentation for details.
 pub(crate) struct Iter<'a, K: ?Sized, V> {
-    #[allow(clippy::struct_field_names)] // TODO: rename to `base`
-    base_iter: BytesIter<'a>,
+    base: BytesIter<'a>,
     prefix: Vec<u8>,
     detach_prefix: bool,
     ended: bool,
@@ -476,7 +447,7 @@ where
     /// Drops the keys returned by the underlying iterator without parsing them.
     pub(crate) fn drop_key_type(self) -> Iter<'a, (), V> {
         Iter {
-            base_iter: self.base_iter,
+            base: self.base,
             prefix: self.prefix,
             detach_prefix: self.detach_prefix,
             ended: self.ended,
@@ -488,7 +459,7 @@ where
     /// Drops the values returned by the underlying iterator without parsing them.
     pub(crate) fn drop_value_type(self) -> Iter<'a, K, ()> {
         Iter {
-            base_iter: self.base_iter,
+            base: self.base,
             prefix: self.prefix,
             detach_prefix: self.detach_prefix,
             ended: self.ended,
@@ -510,7 +481,7 @@ where
             return None;
         }
 
-        if let Some((key_slice, value_slice)) = self.base_iter.next() {
+        if let Some((key_slice, value_slice)) = self.base.next() {
             if key_slice.starts_with(&self.prefix) {
                 let key = if self.detach_prefix {
                     // Since we've checked `start_with`, slicing here cannot panic.
