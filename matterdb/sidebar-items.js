@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IndexType"],"mod":["access","indexes","migration","rocksdb","validation"],"struct":["DBOptions","Error","Fork","IndexAddress","Patch","ReadonlyFork","ResolvedAddress","RocksDB","TemporaryDB"],"trait":["BinaryKey","BinaryValue","Database","Iterator","Snapshot"],"type":["BoxedIterator","Result"]};
